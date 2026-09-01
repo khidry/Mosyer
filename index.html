@@ -65,6 +65,12 @@ input[type=number] { -moz-appearance:textfield; }
 .prefs-group input[type=checkbox] { width:16px; height:16px; margin:0; flex-shrink:0; }
 .prefs-title { font-size:12px; font-weight:bold; color:var(--primary); margin:10px 0 6px; }
 
+/* Fixed sources inputs */
+.src-item { display:flex; align-items:center; gap:10px; width: 100%; }
+.src-item label { width:80px; flex-shrink:0; margin:0; cursor:pointer; }
+.src-item input[type=number] { flex-grow:1; padding:8px; height:34px; font-size:13px; }
+.src-item input[type=number]:disabled { opacity: 0.5; background: var(--border); cursor: not-allowed; }
+
 .list-item { display:flex; justify-content:space-between; align-items:center; padding:10px 12px; border-radius:8px; background:var(--bg-color); margin-bottom:6px; }
 .list-item .meta { font-size:11px; color:var(--text-muted); }
 .list-item-actions { display:flex; gap:4px; }
@@ -98,7 +104,6 @@ tr.row-net-final td, tr.row-net-final th { background:var(--gold-dark); color:#f
 @media (min-width:560px) { .modal-overlay { align-items:center; } }
 .modal-card { background:var(--card-bg); width:100%; max-width:520px; max-height:88vh; overflow-y:auto; border-radius:16px 16px 0 0; padding:18px; position:relative; transform:translateY(24px); transition:.25s; box-shadow:0 -10px 30px rgba(0,0,0,.25); }
 @media (min-width:560px) { .modal-card { border-radius:16px; } }
-.modal-overlay.active .modal-card { transform:translateY(0); }
 .modal-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; }
 .modal-head h2 { font-size:16px; color:var(--primary); }
 .modal-close { background:none; border:none; color:var(--text-muted); cursor:pointer; padding:4px; display:flex; }
@@ -107,7 +112,7 @@ tr.row-net-final td, tr.row-net-final th { background:var(--gold-dark); color:#f
 .btn-info { background:var(--info); color:#fff; }
 .mt-10 { margin-top:10px; }
 
-/* Salary slip card — fixed colors so on-screen preview matches printed paper exactly */
+/* Salary slip card */
 .slip-container { border:1px solid #000; padding:10px; border-radius:8px; background:#fff; margin-bottom:14px; font-family:'Segoe UI', Arial, sans-serif; color:#000; }
 .slip-header { text-align:center; padding-bottom:5px; font-size:18px; font-weight:bold; border-bottom:2px solid #000; margin-bottom:8px; color:#000; }
 .slip-table { width:100%; border-collapse:collapse; font-weight:bold; font-size:13px; }
@@ -136,6 +141,10 @@ td.att-total-cell { background:var(--green-light); font-weight:700; padding:6px 
 .att-table tfoot td { font-weight:800; padding:8px 6px; font-size:11.5px; }
 .att-sum-g td { background:var(--green-dark); color:#fff; }
 .att-sum-r td { background:var(--danger); color:#fff; }
+
+/* Bulk Slips & Attendance View */
+.all-slips-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 16px; padding-bottom: 15px; }
+.slip-att-wrapper { background: var(--bg-color); border: 1px solid var(--border); border-radius: 10px; padding: 12px; }
 
 .print-page-title { text-align:center; font-size:17px; font-weight:bold; background:#eaf1e3; border:1px solid #000; border-radius:6px; padding:9px; margin-bottom:12px; color:#000; }
 .print-cards-grid { display:grid; grid-template-columns:repeat(3, minmax(200px, 1fr)); gap:10px; }
@@ -177,7 +186,7 @@ td.att-total-cell { background:var(--green-light); font-weight:700; padding:6px 
             <input type="month" id="payrollMonth" onchange="Payroll.render()">
             <div class="toolbar-actions">
                 <button class="btn btn-outline btn-sm" onclick="Payroll.print()"><span class="material-icons" style="font-size:16px;">print</span> طباعة</button>
-                <button class="btn btn-outline btn-sm" onclick="Payroll.exportExcel()"><span class="material-icons" style="font-size:16px;">table_view</span> إكسيل</button>
+                <button class="btn btn-outline btn-sm" onclick="Payroll.viewAllSlipsAndAttendance()"><span class="material-icons" style="font-size:16px;">view_module</span> عرض الكروت والحضور</button>
             </div>
         </div>
     </div>
@@ -209,12 +218,18 @@ td.att-total-cell { background:var(--green-light); font-weight:700; padding:6px 
                 <div class="form-group"><label>أيام الإجازة المسموحة شهرياً</label><input type="number" id="empVacations" required min="0" max="30" value="4"></div>
             </div>
 
+            <div class="prefs-title">مصادر صرف الراتب الأساسي (ثابتة شهرياً)</div>
+            <div class="form-row" style="margin-bottom:10px;">
+                <div class="src-item"><label><input type="checkbox" id="empHasCash" onchange="document.getElementById('empValCash').disabled = !this.checked"> كاش</label><input type="number" id="empValCash" disabled class="src-val" placeholder="القيمة"></div>
+                <div class="src-item"><label><input type="checkbox" id="empHasTransfer" onchange="document.getElementById('empValTransfer').disabled = !this.checked"> تحويل</label><input type="number" id="empValTransfer" disabled class="src-val" placeholder="القيمة"></div>
+            </div>
+            <div class="form-row">
+                <div class="src-item"><label><input type="checkbox" id="empHasDrawer" onchange="document.getElementById('empValDrawer').disabled = !this.checked"> شحن</label><input type="number" id="empValDrawer" disabled class="src-val" placeholder="القيمة"></div>
+                <div class="src-item"><label><input type="checkbox" id="empHasTailor" onchange="document.getElementById('empValTailor').disabled = !this.checked"> خياط</label><input type="number" id="empValTailor" disabled class="src-val" placeholder="القيمة"></div>
+            </div>
+
             <div class="prefs-title">بنود تظهر في كارت الراتب المطبوع</div>
             <div class="prefs-group">
-                <label><input type="checkbox" id="prefSalCash"> كاش</label>
-                <label><input type="checkbox" id="prefSalTransfer"> تحويل</label>
-                <label><input type="checkbox" id="prefSalDrawer"> شحن</label>
-                <label><input type="checkbox" id="prefSalTailor"> خياط</label>
                 <label><input type="checkbox" id="prefUnusedOff" checked> إضافي من الأوف</label>
                 <label><input type="checkbox" id="prefOvertime" checked> الإضافي</label>
                 <label><input type="checkbox" id="prefSalesComm" checked> ع. المبيعات</label>
@@ -284,9 +299,20 @@ td.att-total-cell { background:var(--green-light); font-weight:700; padding:6px 
             <button class="modal-close" onclick="UI.closeModal('empSlipModal')"><span class="material-icons">close</span></button>
         </div>
         <div id="empSlipContent"></div>
-        <h3 style="font-size:13px; margin:16px 0 8px; color:var(--text-muted);">سجل الحضور والانصراف</h3>
+        <h3 id="empSlipAttTitle" style="font-size:13px; margin:16px 0 8px; color:var(--text-muted);">سجل الحضور والانصراف</h3>
         <div id="empAttendanceContent"></div>
         <button class="btn btn-info btn-block mt-10" onclick="Payroll.printSingle()"><span class="material-icons" style="font-size:16px;">print</span> طباعة الكارت</button>
+    </div>
+</div>
+
+<!-- All Slips & Attendance Modal -->
+<div class="modal-overlay" id="allSlipsModal">
+    <div class="modal-card" style="max-width:96vw; width:100%;">
+        <div class="modal-head">
+            <h2>عرض الكروت وسجل الحضور الشامل</h2>
+            <button class="modal-close" onclick="UI.closeModal('allSlipsModal')"><span class="material-icons">close</span></button>
+        </div>
+        <div id="allSlipsContent" class="all-slips-grid"></div>
     </div>
 </div>
 
@@ -322,7 +348,7 @@ const DB = {
     saveSettings() { LS.set('pr_settings', this.settings); },
     getRecord(empId, month) {
         let r = this.records.find(x => x.empId === empId && x.month === month);
-        if (!r) r = { empId, month, absentDays:0, otHours:0, delayHours:0, salCash:0, salTransfer:0, salDrawer:0, salTailor:0, advances:0, purchases:0, shippingCredit:0, tabby:0, tamara:0, mora:0, simPhones:0, simHuawei:0 };
+        if (!r) r = { empId, month, absentDays:0, otHours:0, delayHours:0, advances:0, purchases:0, shippingCredit:0, tabby:0, tamara:0, mora:0, simPhones:0, simHuawei:0 };
         return r;
     },
     updateField(empId, month, field, value) {
@@ -368,12 +394,6 @@ const FIELD_GROUPS = [
         { key:'otHours', label:'الإضافي', cls:'neutral', isTime:true },
         { key:'delayHours', label:'التأخير', cls:'neutral', isTime:true },
     ]},
-    { title:'مصدر صرف الراتب الأساسي', fields:[
-        { key:'salCash', label:'كاش', cls:'neutral' },
-        { key:'salTransfer', label:'تحويل', cls:'neutral' },
-        { key:'salDrawer', label:'شحن', cls:'neutral' },
-        { key:'salTailor', label:'خياط', cls:'neutral' },
-    ]},
     { title:'الاستقطاعات', fields:[
         { key:'advances', label:'سلف', cls:'danger' },
         { key:'purchases', label:'آجل النظام', cls:'danger' },
@@ -400,8 +420,11 @@ const Payroll = {
         const absDays = parseFloat(rec.absentDays) || 0;
         const effVac = Math.min(absDays, allowedVac);
         const effAbs = Math.max(0, absDays - allowedVac);
-        const unusedOffDays = allowedVac - effVac;
+        
+        // If employee has 0 allowed vacations, unused off days calculation should not credit them anything extra for simply working
+        const unusedOffDays = allowedVac > 0 ? (allowedVac - effVac) : 0;
         const unusedOffVal = unusedOffDays * dailyRate;
+        
         const absenceVal = effAbs * dailyRate;
         const overTimeVal = (parseFloat(rec.otHours) || 0) * hourlyRate;
         const delayVal = (parseFloat(rec.delayHours) || 0) * hourlyRate;
@@ -504,38 +527,6 @@ const Payroll = {
         else if (e.key === 'ArrowUp') { e.preventDefault(); Payroll.moveFocus(input, -1); }
     },
 
-    moveFocus(input, delta) {
-        const col = input.dataset.col;
-        const idx = FIELD_ORDER.indexOf(input.dataset.field);
-        let newIdx = Math.min(FIELD_ORDER.length - 1, Math.max(0, idx + delta));
-        const target = document.querySelector(`input[data-field="${FIELD_ORDER[newIdx]}"][data-col="${col}"]`);
-        if (target) { target.focus(); target.select(); }
-    },
-
-    buildPrintTable() {
-        const month = document.getElementById('payrollMonth').value;
-        const emps = DB.employees;
-        const recs = emps.map(e => DB.getRecord(e.id, month));
-        let html = `<div class="print-title">مسير الرواتب — <span dir="ltr">${month}</span></div><table class="print-sheet"><thead><tr><th>البند</th>`;
-        emps.forEach(e => html += `<th>${e.name}</th>`);
-        html += '</tr></thead><tbody><tr><td><strong>الراتب الأساسي</strong></td>';
-        emps.forEach(e => html += `<td style="text-align:center;">${e.salary.toFixed(0)}</td>`);
-        html += '</tr>';
-        FIELD_GROUPS.forEach(g => {
-            g.fields.forEach(f => {
-                html += `<tr><td>${f.label}</td>`;
-                emps.forEach((e, ci) => html += `<td style="text-align:center;">${recs[ci][f.key] || 0}</td>`);
-                html += '</tr>';
-            });
-        });
-        html += '<tr class="print-net"><td>الصافي</td>';
-        emps.forEach((e, ci) => { const r = Payroll.calc(e, recs[ci]); html += `<td style="text-align:center;">${r.netForSystem.toFixed(0)}</td>`; });
-        html += '</tr><tr class="print-net-final"><td>النهائي</td>';
-        emps.forEach((e, ci) => { const r = Payroll.calc(e, recs[ci]); html += `<td style="text-align:center;">${r.netFinal.toFixed(0)}</td>`; });
-        html += '</tr></tbody></table>';
-        return html;
-    },
-
     monthLabel(monthStr) {
         if (!monthStr) return '';
         const [y, m] = monthStr.split('-');
@@ -573,6 +564,7 @@ const Payroll = {
         const rec = DB.getRecord(emp.id, month);
         const r = Payroll.calc(emp, rec);
         const prefs = emp.prefs || {};
+        const sources = emp.fixedSources || {};
 
         let comm1Arr = [];
         if (rec.tabby > 0) comm1Arr.push(`${rec.tabby} تابي`);
@@ -590,10 +582,10 @@ const Payroll = {
         let html = `<div class="slip-container"><div class="slip-header">${emp.name}${headerSub}</div>
         <table class="slip-table"><tr class="slip-bg-g-light"><td colspan="2" class="slip-td-right" style="width:77%;">الراتب الأساسي</td><td class="slip-td-left">${emp.salary.toFixed(0)}</td></tr>`;
 
-        if (prefs.showSalCash && (!cleanPrint || rec.salCash > 0)) html += `<tr class="slip-bg-g-light slip-sub-item"><td class="slip-td-right">— من الكاش</td><td class="slip-td-sub-val">${rec.salCash.toFixed(0)}</td><td></td></tr>`;
-        if (prefs.showSalTransfer && (!cleanPrint || rec.salTransfer > 0)) html += `<tr class="slip-bg-g-light slip-sub-item"><td class="slip-td-right">— من التحويل</td><td class="slip-td-sub-val">${rec.salTransfer.toFixed(0)}</td><td></td></tr>`;
-        if (prefs.showSalDrawer && (!cleanPrint || rec.salDrawer > 0)) html += `<tr class="slip-bg-g-light slip-sub-item"><td class="slip-td-right">— من الشحن</td><td class="slip-td-sub-val">${rec.salDrawer.toFixed(0)}</td><td></td></tr>`;
-        if (prefs.showSalTailor && (!cleanPrint || rec.salTailor > 0)) html += `<tr class="slip-bg-g-light slip-sub-item"><td class="slip-td-right">— من الخياط</td><td class="slip-td-sub-val">${rec.salTailor.toFixed(0)}</td><td></td></tr>`;
+        if (sources.cash > 0) html += `<tr class="slip-bg-g-light slip-sub-item"><td class="slip-td-right">— من الكاش</td><td class="slip-td-sub-val">${sources.cash.toFixed(0)}</td><td></td></tr>`;
+        if (sources.transfer > 0) html += `<tr class="slip-bg-g-light slip-sub-item"><td class="slip-td-right">— من التحويل</td><td class="slip-td-sub-val">${sources.transfer.toFixed(0)}</td><td></td></tr>`;
+        if (sources.drawer > 0) html += `<tr class="slip-bg-g-light slip-sub-item"><td class="slip-td-right">— من الشحن</td><td class="slip-td-sub-val">${sources.drawer.toFixed(0)}</td><td></td></tr>`;
+        if (sources.tailor > 0) html += `<tr class="slip-bg-g-light slip-sub-item"><td class="slip-td-right">— من الخياط</td><td class="slip-td-sub-val">${sources.tailor.toFixed(0)}</td><td></td></tr>`;
 
         if (prefs.showUnusedOff && (!cleanPrint || r.unusedOffVal > 0)) html += `<tr class="slip-bg-g-light"><td class="slip-td-right">إضافي من الأوف</td><td class="slip-td-center">${r.unusedOffDays} أيام</td><td class="slip-td-left">${r.unusedOffVal.toFixed(0)}</td></tr>`;
         if (prefs.showOvertime && (!cleanPrint || r.overTimeVal > 0)) html += `<tr class="slip-bg-g-light"><td class="slip-td-right">إضافي</td><td class="slip-td-center">${Payroll.formatHM(rec.otHours)} ساعة</td><td class="slip-td-left">${r.overTimeVal.toFixed(0)}</td></tr>`;
@@ -621,11 +613,32 @@ const Payroll = {
         if (!emp) return;
         Payroll._currentSlipEmp = empId;
         document.getElementById('empSlipTitle').textContent = 'كارت راتب — ' + emp.name;
-        Attendance.syncToPayroll(emp, month);
+        
+        // التحقق مما إذا كان للموظف حضور (إجازاته ليست 0)
+        const hasAttendance = parseFloat(emp.vacations) !== 0;
+        
+        if (hasAttendance) {
+            Attendance.syncToPayroll(emp, month);
+        }
+        
         document.getElementById('empSlipContent').innerHTML = Payroll.generateSlipHTML(emp, month);
-        document.getElementById('empAttendanceContent').innerHTML = Attendance.render(emp, month);
+        
+        const attTitle = document.getElementById('empSlipAttTitle');
+        const attContent = document.getElementById('empAttendanceContent');
+        
+        if (hasAttendance) {
+            if (attTitle) attTitle.style.display = 'block';
+            attContent.style.display = 'block';
+            attContent.innerHTML = Attendance.render(emp, month);
+            Attendance.refreshSheetInputs(empId);
+        } else {
+            // إخفاء سجل الحضور إذا لم يكن لديه إجازات (الرصيد 0)
+            if (attTitle) attTitle.style.display = 'none';
+            attContent.style.display = 'none';
+            attContent.innerHTML = '';
+        }
+        
         Payroll.recalcEmployee(empId, month);
-        Attendance.refreshSheetInputs(empId);
         UI.openModal('empSlipModal');
     },
 
@@ -637,21 +650,31 @@ const Payroll = {
         Payroll._withPrintTitle(`راتب ${emp.name} (${Payroll.monthLabel(month)})`);
     },
 
-    exportExcel() {
+    viewAllSlipsAndAttendance() {
         if (DB.employees.length === 0) return UI.toast('أضف موظفين أولاً');
         const month = document.getElementById('payrollMonth').value;
-        const inner = Payroll.buildPrintTable().replace('print-sheet', 'print-sheet excel-table');
-        const finalHtml = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
-            <head><meta charset="utf-8"><style>
-                body{direction:rtl;font-family:'Segoe UI',Tahoma,Arial,sans-serif;}
-                table{border-collapse:collapse;width:100%;} table,th,td{border:1px solid #000;} th,td{padding:5px;}
-                .print-net{background:#dcecd0 !important;} .print-net-final{background:#f3e2b0 !important;}
-            </style></head><body>${inner}</body></html>`;
-        const blob = new Blob(['\uFEFF' + finalHtml], { type:'application/vnd.ms-excel;charset=utf-8' });
-        const link = document.createElement('a');
-        link.href = URL.createObjectURL(blob);
-        link.download = `مسير_الرواتب_${month}.xls`;
-        link.click();
+        let html = '';
+        
+        DB.employees.forEach(emp => {
+            // تجاهل وإخفاء الموظف بالكامل من هذه القائمة إذا لم يكن له حضور وانصراف
+            if (parseFloat(emp.vacations) === 0) return;
+            
+            Attendance.syncToPayroll(emp, month);
+            let slipHTML = Payroll.generateSlipHTML(emp, month);
+            let attHTML = Attendance.render(emp, month);
+            html += `<div class="slip-att-wrapper">
+                        <div id="bulk-slip-${emp.id}">${slipHTML}</div>
+                        <h3 style="font-size:13px; margin:16px 0 8px; color:var(--text-muted);">سجل الحضور - ${emp.name}</h3>
+                        ${attHTML}
+                     </div>`;
+        });
+        
+        if (!html) {
+            html = '<div class="empty-state">لا يوجد موظفين لديهم سجل حضور (رصيد الإجازات 0 لجميع الموظفين)</div>';
+        }
+        
+        document.getElementById('allSlipsContent').innerHTML = html;
+        UI.openModal('allSlipsModal');
     }
 };
 
@@ -737,9 +760,9 @@ const Attendance = {
 
         const s = Attendance.computeMonthSummary(emp, month);
         html += `</tbody><tfoot>
-            <tr class="att-sum-g"><td colspan="3">إجمالي الساعات</td><td colspan="2" id="att-total-hours">${Payroll.formatHM(s.totalHours)}</td><td>الحضور</td><td id="att-present">${s.presentDays}</td></tr>
-            <tr class="att-sum-r"><td colspan="3">تأخير</td><td colspan="2" id="att-delay">${Payroll.formatHM(s.delayAgg)}</td><td>Off</td><td id="att-off">${s.offDays}</td></tr>
-            <tr class="att-sum-g"><td colspan="3">نصاب العمل</td><td colspan="2" id="att-quota">${Payroll.formatHM(s.quota)}</td><td colspan="2">${emp.name}</td></tr>
+            <tr class="att-sum-g"><td colspan="3">إجمالي الساعات</td><td colspan="2" id="att-total-hours-${emp.id}">${Payroll.formatHM(s.totalHours)}</td><td>الحضور</td><td id="att-present-${emp.id}">${s.presentDays}</td></tr>
+            <tr class="att-sum-r"><td colspan="3">تأخير</td><td colspan="2" id="att-delay-${emp.id}">${Payroll.formatHM(s.delayAgg)}</td><td>Off</td><td id="att-off-${emp.id}">${s.offDays}</td></tr>
+            <tr class="att-sum-g"><td colspan="3">نصاب العمل</td><td colspan="2" id="att-quota-${emp.id}">${Payroll.formatHM(s.quota)}</td><td colspan="2">${emp.name}</td></tr>
         </tfoot></table></div>`;
         return html;
     },
@@ -763,15 +786,25 @@ const Attendance = {
 
         const emp = DB.employees.find(e => e.id === empId);
         const s = Attendance.computeMonthSummary(emp, month);
-        document.getElementById('att-total-hours').textContent = Payroll.formatHM(s.totalHours);
-        document.getElementById('att-present').textContent = s.presentDays;
-        document.getElementById('att-delay').textContent = Payroll.formatHM(s.delayAgg);
-        document.getElementById('att-off').textContent = s.offDays;
-        document.getElementById('att-quota').textContent = Payroll.formatHM(s.quota);
+        
+        const tbl = input.closest('table');
+        if(tbl) {
+            const hEl = tbl.querySelector(`#att-total-hours-${empId}`); if(hEl) hEl.textContent = Payroll.formatHM(s.totalHours);
+            const pEl = tbl.querySelector(`#att-present-${empId}`); if(pEl) pEl.textContent = s.presentDays;
+            const dEl = tbl.querySelector(`#att-delay-${empId}`); if(dEl) dEl.textContent = Payroll.formatHM(s.delayAgg);
+            const oEl = tbl.querySelector(`#att-off-${empId}`); if(oEl) oEl.textContent = s.offDays;
+            const qEl = tbl.querySelector(`#att-quota-${empId}`); if(qEl) qEl.textContent = Payroll.formatHM(s.quota);
+        }
 
         Attendance.syncToPayroll(emp, month);
         Payroll.recalcEmployee(empId, month);
-        document.getElementById('empSlipContent').innerHTML = Payroll.generateSlipHTML(emp, month);
+
+        const singleSlip = document.getElementById('empSlipContent');
+        if (singleSlip && Payroll._currentSlipEmp === empId) singleSlip.innerHTML = Payroll.generateSlipHTML(emp, month);
+
+        const bulkSlip = document.getElementById('bulk-slip-' + empId);
+        if (bulkSlip) bulkSlip.innerHTML = Payroll.generateSlipHTML(emp, month);
+
         Attendance.refreshSheetInputs(empId);
     },
 
@@ -795,11 +828,15 @@ const Employees = {
         const salary = parseFloat(document.getElementById('empSalary').value);
         const hours = parseFloat(document.getElementById('empHours').value);
         const vacations = parseFloat(document.getElementById('empVacations').value);
+        
+        const fixedSources = {
+            cash: document.getElementById('empHasCash').checked ? (parseFloat(document.getElementById('empValCash').value) || 0) : 0,
+            transfer: document.getElementById('empHasTransfer').checked ? (parseFloat(document.getElementById('empValTransfer').value) || 0) : 0,
+            drawer: document.getElementById('empHasDrawer').checked ? (parseFloat(document.getElementById('empValDrawer').value) || 0) : 0,
+            tailor: document.getElementById('empHasTailor').checked ? (parseFloat(document.getElementById('empValTailor').value) || 0) : 0
+        };
+
         const prefs = {
-            showSalCash: document.getElementById('prefSalCash').checked,
-            showSalTransfer: document.getElementById('prefSalTransfer').checked,
-            showSalDrawer: document.getElementById('prefSalDrawer').checked,
-            showSalTailor: document.getElementById('prefSalTailor').checked,
             showUnusedOff: document.getElementById('prefUnusedOff').checked,
             showOvertime: document.getElementById('prefOvertime').checked,
             showSalesComm: document.getElementById('prefSalesComm').checked,
@@ -811,12 +848,13 @@ const Employees = {
             showShipping: document.getElementById('prefShipping').checked,
             showFinalNet: document.getElementById('prefFinalNet').checked
         };
+        
         if (id) {
             const emp = DB.employees.find(x => x.id === id);
-            Object.assign(emp, { name, salary, hours, vacations, prefs });
+            Object.assign(emp, { name, salary, hours, vacations, fixedSources, prefs });
             UI.toast('تم تعديل الموظف');
         } else {
-            DB.employees.push({ id:'emp_' + Date.now(), name, salary, hours, vacations, prefs });
+            DB.employees.push({ id:'emp_' + Date.now(), name, salary, hours, vacations, fixedSources, prefs });
             UI.toast('تمت الإضافة');
         }
         DB.saveEmployees();
@@ -833,10 +871,28 @@ const Employees = {
         document.getElementById('empSalary').value = emp.salary;
         document.getElementById('empHours').value = emp.hours;
         document.getElementById('empVacations').value = emp.vacations ?? 4;
+        
+        const fs = emp.fixedSources || {};
+        document.getElementById('empHasCash').checked = fs.cash > 0;
+        document.getElementById('empValCash').value = fs.cash || '';
+        document.getElementById('empValCash').disabled = !(fs.cash > 0);
+
+        document.getElementById('empHasTransfer').checked = fs.transfer > 0;
+        document.getElementById('empValTransfer').value = fs.transfer || '';
+        document.getElementById('empValTransfer').disabled = !(fs.transfer > 0);
+
+        document.getElementById('empHasDrawer').checked = fs.drawer > 0;
+        document.getElementById('empValDrawer').value = fs.drawer || '';
+        document.getElementById('empValDrawer').disabled = !(fs.drawer > 0);
+
+        document.getElementById('empHasTailor').checked = fs.tailor > 0;
+        document.getElementById('empValTailor').value = fs.tailor || '';
+        document.getElementById('empValTailor').disabled = !(fs.tailor > 0);
+
         const prefs = emp.prefs || {};
-        ['SalCash','SalTransfer','SalDrawer','SalTailor','UnusedOff','Overtime','SalesComm','SimComm','Absence','Delay','Advances','Purchases','Shipping','FinalNet'].forEach(p => {
+        ['UnusedOff','Overtime','SalesComm','SimComm','Absence','Delay','Advances','Purchases','Shipping','FinalNet'].forEach(p => {
             const el = document.getElementById('pref' + p);
-            if (el) el.checked = prefs['show' + p] !== undefined ? prefs['show' + p] : !p.startsWith('Sal');
+            if (el) el.checked = prefs['show' + p] !== undefined ? prefs['show' + p] : true;
         });
         document.getElementById('btnSaveEmp').innerHTML = '<span class="material-icons" style="font-size:16px;">save</span> حفظ التعديلات';
         document.getElementById('btnCancelEmp').classList.remove('hidden');
@@ -848,9 +904,14 @@ const Employees = {
         document.getElementById('editEmpId').value = '';
         document.getElementById('empHours').value = 8;
         document.getElementById('empVacations').value = 4;
+        
+        ['Cash','Transfer','Drawer','Tailor'].forEach(s => {
+            document.getElementById('empVal' + s).disabled = true;
+        });
+
         document.getElementById('btnSaveEmp').innerHTML = '<span class="material-icons" style="font-size:16px;">add</span> إضافة موظف';
         document.getElementById('btnCancelEmp').classList.add('hidden');
-        document.querySelectorAll('#empForm .prefs-group input[type=checkbox]').forEach(cb => cb.checked = !cb.id.startsWith('prefSal'));
+        document.querySelectorAll('#empForm .prefs-group input[type=checkbox]').forEach(cb => cb.checked = true);
     },
 
     delete(id) {
