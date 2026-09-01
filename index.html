@@ -1,0 +1,699 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>مسير الرواتب</title>
+<meta name="theme-color" content="#4CAF50">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="مسير الرواتب">
+<link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+<link rel="manifest" href='data:application/manifest+json;utf8,{"name":"مسير الرواتب","short_name":"الرواتب","display":"standalone","background_color":"#f4f6f8","theme_color":"#4CAF50","start_url":".","icons":[{"src":"https://cdn-icons-png.flaticon.com/512/2933/2933116.png","sizes":"512x512","type":"image/png"}]}'>
+
+<style>
+:root {
+    --bg-color:#f4f6f8; --card-bg:#ffffff; --text-main:#333333; --text-muted:#777777;
+    --primary:#4CAF50; --primary-hover:#45a049; --danger:#f44336; --warning:#ff9800; --info:#2196f3;
+    --border:#e0e0e0; --shadow:0 4px 6px rgba(0,0,0,0.05);
+    --green-light:#eaf1e3; --red-light:#f7e6e1; --blue-light:#e3f0fa; --green-dark:#5c8a3d; --gold-dark:#b8860b;
+    --head-bg:#fff6c9;
+}
+[data-theme="dark"] {
+    --bg-color:#121212; --card-bg:#1e1e1e; --text-main:#e8e8e8; --text-muted:#aaaaaa;
+    --primary:#81c784; --primary-hover:#66bb6a; --danger:#e57373; --warning:#ffb74d; --info:#64b5f6;
+    --border:#333333; --shadow:0 4px 6px rgba(0,0,0,0.3);
+    --green-light:#1e2e1e; --red-light:#3a1c1c; --blue-light:#152a38; --green-dark:#2d4a22; --gold-dark:#5c4a12;
+    --head-bg:#3a3110;
+}
+* { box-sizing:border-box; margin:0; padding:0; }
+body { font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background:var(--bg-color); color:var(--text-main); transition:.2s; padding-bottom:20px; }
+
+.app-header { background:var(--card-bg); padding:14px 16px; display:flex; justify-content:space-between; align-items:center; box-shadow:var(--shadow); position:sticky; top:0; z-index:100; }
+.header-title { display:flex; align-items:center; gap:8px; color:var(--primary); }
+.header-title h1 { font-size:17px; }
+.header-actions { display:flex; gap:4px; }
+.icon-btn { background:none; border:none; color:var(--text-main); cursor:pointer; display:flex; align-items:center; justify-content:center; padding:7px; border-radius:50%; }
+.icon-btn:active { background:var(--bg-color); }
+
+.app-main { padding:12px; max-width:1200px; margin:0 auto; }
+.card { background:var(--card-bg); border-radius:12px; padding:16px; box-shadow:var(--shadow); margin-bottom:14px; }
+
+.toolbar { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; }
+.toolbar input[type=month] { padding:9px 10px; border-radius:8px; border:1px solid var(--border); background:var(--bg-color); color:var(--text-main); font-family:inherit; font-size:14px; }
+.toolbar-actions { display:flex; gap:6px; }
+
+.btn { padding:10px 14px; border-radius:8px; font-size:13px; font-weight:bold; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; gap:6px; border:none; transition:.2s; }
+.btn:active { opacity:.8; }
+.btn-primary { background:var(--primary); color:#fff; }
+.btn-danger { background:var(--danger); color:#fff; }
+.btn-outline { background:transparent; border:1px solid var(--border); color:var(--text-main); }
+.btn-sm { padding:8px 10px; font-size:12px; }
+.btn-block { width:100%; }
+
+label { display:block; margin-bottom:6px; font-weight:600; font-size:12px; color:var(--text-main); }
+input, select { width:100%; padding:11px 10px; border-radius:8px; border:1px solid var(--border); background:var(--bg-color); color:var(--text-main); font-family:inherit; font-size:14px; }
+input:focus, select:focus { outline:none; border-color:var(--primary); }
+input[type=number]::-webkit-inner-spin-button, input[type=number]::-webkit-outer-spin-button { -webkit-appearance:none; margin:0; }
+input[type=number] { -moz-appearance:textfield; }
+.form-row { display:grid; grid-template-columns:repeat(2,1fr); gap:10px; margin-bottom:10px; }
+.form-group { display:flex; flex-direction:column; }
+@media (max-width:460px) { .form-row { grid-template-columns:1fr; } }
+
+.prefs-group { display:flex; flex-wrap:wrap; gap:8px 14px; padding:10px; background:var(--bg-color); border-radius:8px; border:1px solid var(--border); margin-bottom:10px; }
+.prefs-group label { display:flex; align-items:center; gap:6px; font-size:12px; font-weight:600; cursor:pointer; margin:0; width:calc(50% - 7px); }
+.prefs-group input[type=checkbox] { width:16px; height:16px; margin:0; flex-shrink:0; }
+.prefs-title { font-size:12px; font-weight:bold; color:var(--primary); margin:10px 0 6px; }
+
+.list-item { display:flex; justify-content:space-between; align-items:center; padding:10px 12px; border-radius:8px; background:var(--bg-color); margin-bottom:6px; }
+.list-item .meta { font-size:11px; color:var(--text-muted); }
+.list-item-actions { display:flex; gap:4px; }
+
+/* Excel-style sheet */
+.sheet-wrap { overflow:auto; border:1px solid var(--border); border-radius:8px; max-height:70vh; }
+table.sheet { border-collapse:collapse; width:100%; }
+.sheet th, .sheet td { border:1px solid var(--border); white-space:nowrap; }
+.sheet thead th { position:sticky; top:0; z-index:4; }
+.sheet-label { text-align:right; padding:9px 10px; font-size:12.5px; font-weight:600; background:var(--card-bg); position:sticky; right:0; z-index:2; min-width:130px; }
+.sheet thead .sheet-label { z-index:5; background:var(--card-bg); }
+th.emp-head { background:var(--head-bg); padding:10px 8px; font-size:13px; font-weight:800; text-align:center; min-width:100px; color:var(--text-main); cursor:pointer; }
+th.emp-head:active { opacity:.7; }
+.sheet-cell { padding:0; text-align:center; }
+.sheet-input { width:100%; height:100%; min-height:40px; border:none; text-align:center; font-size:13px; background:transparent; padding:9px 4px; color:var(--text-main); font-family:inherit; }
+.sheet-input:focus { outline:2px solid var(--primary); outline-offset:-2px; background:var(--card-bg); }
+.cell-neutral { background:var(--card-bg); }
+.cell-danger { background:var(--red-light); }
+.cell-success { background:var(--green-light); }
+.cell-info { background:var(--blue-light); }
+.sheet-group td { background:var(--primary); color:#fff; font-size:11.5px; font-weight:bold; padding:6px 10px; text-align:right; }
+tr.row-base td, tr.row-base th { font-weight:800; background:var(--head-bg); }
+tr.row-net td, tr.row-net th { background:var(--green-dark); color:#fff; font-weight:800; padding:10px; font-size:13.5px; }
+tr.row-net-final td, tr.row-net-final th { background:var(--gold-dark); color:#fff; font-weight:800; padding:11px; font-size:14px; }
+.sheet-hint { font-size:11px; color:var(--text-muted); margin-top:8px; line-height:1.6; }
+.empty-state { padding:30px 15px; text-align:center; color:var(--text-muted); font-size:13px; }
+
+/* Modals - floating & simple */
+.modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:3000; display:flex; justify-content:center; align-items:flex-end; opacity:0; pointer-events:none; transition:.25s; }
+.modal-overlay.active { opacity:1; pointer-events:all; }
+@media (min-width:560px) { .modal-overlay { align-items:center; } }
+.modal-card { background:var(--card-bg); width:100%; max-width:520px; max-height:88vh; overflow-y:auto; border-radius:16px 16px 0 0; padding:18px; position:relative; transform:translateY(24px); transition:.25s; box-shadow:0 -10px 30px rgba(0,0,0,.25); }
+@media (min-width:560px) { .modal-card { border-radius:16px; } }
+.modal-overlay.active .modal-card { transform:translateY(0); }
+.modal-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; }
+.modal-head h2 { font-size:16px; color:var(--primary); }
+.modal-close { background:none; border:none; color:var(--text-muted); cursor:pointer; padding:4px; display:flex; }
+
+.toast { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:var(--text-main); color:var(--bg-color); padding:11px 18px; border-radius:30px; font-size:12.5px; z-index:5000; box-shadow:0 4px 10px rgba(0,0,0,.2); transition:.3s; }
+.btn-info { background:var(--info); color:#fff; }
+.mt-10 { margin-top:10px; }
+
+/* Salary slip card — fixed colors so on-screen preview matches printed paper exactly */
+.slip-container { border:1px solid #000; padding:10px; border-radius:8px; background:#fff; margin-bottom:14px; font-family:'Segoe UI', Arial, sans-serif; color:#000; }
+.slip-header { text-align:center; padding-bottom:5px; font-size:18px; font-weight:bold; border-bottom:2px solid #000; margin-bottom:8px; color:#000; }
+.slip-table { width:100%; border-collapse:collapse; font-weight:bold; font-size:13px; }
+.slip-table td { padding:7px 5px; border:none; color:#000; }
+.slip-bg-g-light { background:#eaf1e3 !important; border-bottom:2px solid #fff; }
+.slip-bg-r-light { background:#f7e6e1 !important; border-bottom:2px solid #fff; }
+.slip-bg-g-dark { background:#c0d8a5 !important; border-top:2px solid #000; border-bottom:2px solid #000; }
+.slip-td-right { text-align:right; width:38%; padding-right:12px !important; }
+.slip-td-center { text-align:center; width:38%; font-size:11px; color:#555; }
+.slip-td-left { text-align:left; width:24%; padding-left:12px !important; font-size:16px; font-family:Arial, sans-serif; }
+.slip-sub-item td { font-size:11px; color:#666 !important; padding-top:3px !important; padding-bottom:3px !important; }
+.slip-sub-item .slip-td-right { padding-right:26px !important; font-weight:normal; }
+.slip-td-sub-val { text-align:left; padding-left:18px; font-size:13px; font-family:Arial, sans-serif; width:38%; color:#666; }
+
+#printArea { display:none; }
+@media print {
+    body * { visibility:hidden; }
+    #printArea, #printArea * { visibility:visible; }
+    #printArea { display:block !important; position:absolute; top:0; right:0; width:100%; direction:rtl; }
+    .print-sheet { width:100%; border-collapse:collapse; font-size:11px; }
+    .print-sheet th, .print-sheet td { border:1px solid #000; padding:4px; color:#000 !important; }
+    .print-sheet thead th { background:#fff6c9 !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+    .print-title { text-align:center; font-size:16px; font-weight:bold; margin-bottom:10px; }
+    .print-net { background:#dcecd0 !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; font-weight:bold; }
+    .print-net-final { background:#f3e2b0 !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; font-weight:bold; }
+    .slip-bg-g-light, .slip-bg-r-light, .slip-bg-g-dark { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+    .slip-container { page-break-inside:avoid; margin-bottom:10px; }
+}
+</style>
+</head>
+<body>
+
+<header class="app-header">
+    <div class="header-title"><span class="material-icons">payments</span><h1>مسير الرواتب</h1></div>
+    <div class="header-actions">
+        <button class="icon-btn" onclick="UI.openModal('employeesModal')" title="الموظفين"><span class="material-icons">group</span></button>
+        <button class="icon-btn" onclick="UI.openModal('settingsModal')" title="الإعدادات"><span class="material-icons">settings</span></button>
+    </div>
+</header>
+
+<main class="app-main">
+    <div class="card">
+        <div class="toolbar">
+            <input type="month" id="payrollMonth" onchange="Payroll.render()">
+            <div class="toolbar-actions">
+                <button class="btn btn-outline btn-sm" onclick="Payroll.print()"><span class="material-icons" style="font-size:16px;">print</span> طباعة</button>
+                <button class="btn btn-outline btn-sm" onclick="Payroll.exportExcel()"><span class="material-icons" style="font-size:16px;">table_view</span> إكسيل</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="sheet-wrap">
+            <table class="sheet" id="payrollSheet"></table>
+        </div>
+        <p class="sheet-hint">أدخل في الخلية واضغط <strong>Enter</strong> للنزول للبند التالي لنفس الموظف، أو <strong>Tab</strong> للانتقال بين الموظفين. الصافي بالنسبة للنظام يستثني عمولة الشرائح وآجل الشحن، والصافي النهائي يضيف عمولة الشرائح ويخصم آجل الشحن.</p>
+    </div>
+</main>
+
+<!-- Employees Modal -->
+<div class="modal-overlay" id="employeesModal">
+    <div class="modal-card">
+        <div class="modal-head">
+            <h2>الموظفين</h2>
+            <button class="modal-close" onclick="UI.closeModal('employeesModal')"><span class="material-icons">close</span></button>
+        </div>
+
+        <form id="empForm" onsubmit="Employees.handleSave(event)">
+            <input type="hidden" id="editEmpId">
+            <div class="form-row">
+                <div class="form-group"><label>اسم الموظف</label><input type="text" id="empName" required></div>
+                <div class="form-group"><label>الراتب الأساسي</label><input type="number" id="empSalary" required min="1"></div>
+            </div>
+            <div class="form-row">
+                <div class="form-group"><label>ساعات العمل يومياً</label><input type="number" id="empHours" required min="1" max="24" value="8"></div>
+                <div class="form-group"><label>أيام الإجازة المسموحة شهرياً</label><input type="number" id="empVacations" required min="0" max="30" value="4"></div>
+            </div>
+
+            <div class="prefs-title">بنود تظهر في كارت الراتب المطبوع</div>
+            <div class="prefs-group">
+                <label><input type="checkbox" id="prefSalCash"> كاش</label>
+                <label><input type="checkbox" id="prefSalTransfer"> تحويل</label>
+                <label><input type="checkbox" id="prefSalDrawer"> شحن</label>
+                <label><input type="checkbox" id="prefSalTailor"> خياط</label>
+                <label><input type="checkbox" id="prefUnusedOff" checked> إضافي من الأوف</label>
+                <label><input type="checkbox" id="prefOvertime" checked> الإضافي</label>
+                <label><input type="checkbox" id="prefSalesComm" checked> ع. المبيعات</label>
+                <label><input type="checkbox" id="prefSimComm" checked> ع. الشرائح</label>
+                <label><input type="checkbox" id="prefAbsence" checked> الغياب</label>
+                <label><input type="checkbox" id="prefDelay" checked> التأخير</label>
+                <label><input type="checkbox" id="prefAdvances" checked> السلف</label>
+                <label><input type="checkbox" id="prefPurchases" checked> آجل النظام</label>
+                <label><input type="checkbox" id="prefShipping" checked> آجل الشحن</label>
+                <label><input type="checkbox" id="prefFinalNet" checked> الصافي النهائي</label>
+            </div>
+
+            <div style="display:flex; gap:8px;">
+                <button type="submit" class="btn btn-primary btn-block" id="btnSaveEmp"><span class="material-icons" style="font-size:16px;">add</span> إضافة موظف</button>
+                <button type="button" class="btn btn-outline hidden" id="btnCancelEmp" onclick="Employees.cancelEdit()">إلغاء</button>
+            </div>
+        </form>
+
+        <h3 style="font-size:13px; margin:16px 0 8px; color:var(--text-muted);">قائمة الموظفين</h3>
+        <div id="empList"></div>
+    </div>
+</div>
+
+<!-- Settings Modal -->
+<div class="modal-overlay" id="settingsModal">
+    <div class="modal-card">
+        <div class="modal-head">
+            <h2>الإعدادات</h2>
+            <button class="modal-close" onclick="UI.closeModal('settingsModal')"><span class="material-icons">close</span></button>
+        </div>
+
+        <div class="prefs-title">قيمة عمولة كل عملية</div>
+        <div class="form-row">
+            <div class="form-group"><label>تابي (لكل عملية)</label><input type="number" id="crTabby" onchange="Settings.saveRate('tabby', this.value)"></div>
+            <div class="form-group"><label>تمارا (لكل عملية)</label><input type="number" id="crTamara" onchange="Settings.saveRate('tamara', this.value)"></div>
+        </div>
+        <div class="form-row">
+            <div class="form-group"><label>مورا (لكل عملية)</label><input type="number" id="crMora" onchange="Settings.saveRate('mora', this.value)"></div>
+            <div class="form-group"><label>عمولة الشريحة الواحدة</label><input type="number" id="crSim" onchange="Settings.saveRate('simRate', this.value)"></div>
+        </div>
+
+        <div class="prefs-title">المظهر</div>
+        <div class="prefs-group">
+            <label><input type="checkbox" id="darkModeToggle" onchange="Settings.toggleTheme(this.checked)"> الوضع الليلي</label>
+        </div>
+
+        <div class="prefs-title">البيانات</div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+            <button class="btn btn-outline btn-sm" onclick="Settings.backup()"><span class="material-icons" style="font-size:16px;">download</span> نسخ احتياطي</button>
+            <button class="btn btn-outline btn-sm" onclick="document.getElementById('restoreFile').click()"><span class="material-icons" style="font-size:16px;">upload</span> استرجاع</button>
+            <input type="file" id="restoreFile" accept="application/json" class="hidden" style="display:none" onchange="Settings.restore(event)">
+            <button class="btn btn-danger btn-sm" onclick="Settings.clearAll()"><span class="material-icons" style="font-size:16px;">delete_forever</span> مسح الكل</button>
+        </div>
+    </div>
+</div>
+
+<!-- Employee Slip Modal -->
+<div class="modal-overlay" id="empSlipModal">
+    <div class="modal-card">
+        <div class="modal-head">
+            <h2 id="empSlipTitle">كارت الراتب</h2>
+            <button class="modal-close" onclick="UI.closeModal('empSlipModal')"><span class="material-icons">close</span></button>
+        </div>
+        <div id="empSlipContent"></div>
+        <button class="btn btn-info btn-block mt-10" onclick="Payroll.printSingle()"><span class="material-icons" style="font-size:16px;">print</span> طباعة الكارت</button>
+    </div>
+</div>
+
+<!-- Bulk Print Preview Modal -->
+<div class="modal-overlay" id="printPreviewModal">
+    <div class="modal-card" style="max-width:600px;">
+        <div class="modal-head">
+            <h2>معاينة الطباعة</h2>
+            <button class="modal-close" onclick="UI.closeModal('printPreviewModal')"><span class="material-icons">close</span></button>
+        </div>
+        <div id="printPreviewContent"></div>
+        <button class="btn btn-info btn-block mt-10" onclick="Payroll.confirmPrintAll()"><span class="material-icons" style="font-size:16px;">print</span> طباعة الكل</button>
+    </div>
+</div>
+
+<div id="printArea"></div>
+
+<script>
+/* ---------------- Storage / Data layer ---------------- */
+const LS = {
+    get(key, def) { try { const v = JSON.parse(localStorage.getItem(key)); return v === null || v === undefined ? def : v; } catch { return def; } },
+    set(key, val) { localStorage.setItem(key, JSON.stringify(val)); }
+};
+
+const DB = {
+    employees: LS.get('pr_employees', []),
+    records: LS.get('pr_records', []),
+    settings: LS.get('pr_settings', { commRates:{ tabby:20, tamara:20, mora:100, simRate:5 }, theme:'light' }),
+    saveEmployees() { LS.set('pr_employees', this.employees); },
+    saveRecords() { LS.set('pr_records', this.records); },
+    saveSettings() { LS.set('pr_settings', this.settings); },
+    getRecord(empId, month) {
+        let r = this.records.find(x => x.empId === empId && x.month === month);
+        if (!r) r = { empId, month, absentDays:0, otHours:0, delayHours:0, salCash:0, salTransfer:0, salDrawer:0, salTailor:0, advances:0, purchases:0, shippingCredit:0, tabby:0, tamara:0, mora:0, simPhones:0, simHuawei:0 };
+        return r;
+    },
+    updateField(empId, month, field, value) {
+        let idx = this.records.findIndex(x => x.empId === empId && x.month === month);
+        let val = parseFloat(value) || 0;
+        if (idx > -1) { this.records[idx][field] = val; }
+        else { let r = this.getRecord(empId, month); r[field] = val; this.records.push(r); }
+        this.saveRecords();
+    }
+};
+if (!DB.settings.commRates) DB.settings.commRates = { tabby:20, tamara:20, mora:100, simRate:5 };
+
+/* ---------------- UI helpers ---------------- */
+const UI = {
+    toast(msg) { let t = document.createElement('div'); t.className = 'toast'; t.textContent = msg; document.body.appendChild(t); setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 300); }, 1600); },
+    openModal(id) { document.getElementById(id).classList.add('active'); if (id === 'employeesModal') Employees.render(); if (id === 'settingsModal') Settings.render(); },
+    closeModal(id) { document.getElementById(id).classList.remove('active'); }
+};
+
+/* ---------------- Field definitions for the sheet ---------------- */
+const FIELD_GROUPS = [
+    { title:'بيانات الحضور (تُدخل يدوياً من سجل الإكسيل)', fields:[
+        { key:'absentDays', label:'أيام الغياب/الإجازة', cls:'neutral' },
+        { key:'otHours', label:'ساعات الإضافي', cls:'neutral' },
+        { key:'delayHours', label:'ساعات التأخير', cls:'neutral' },
+    ]},
+    { title:'مصدر صرف الراتب الأساسي', fields:[
+        { key:'salCash', label:'كاش', cls:'neutral' },
+        { key:'salTransfer', label:'تحويل', cls:'neutral' },
+        { key:'salDrawer', label:'شحن', cls:'neutral' },
+        { key:'salTailor', label:'خياط', cls:'neutral' },
+    ]},
+    { title:'الاستقطاعات', fields:[
+        { key:'advances', label:'سلف', cls:'danger' },
+        { key:'purchases', label:'آجل النظام', cls:'danger' },
+        { key:'shippingCredit', label:'آجل الشحن', cls:'danger' },
+    ]},
+    { title:'عمولة المبيعات (تدخل ضمن صافي النظام)', fields:[
+        { key:'tabby', label:'تابي', cls:'success' },
+        { key:'tamara', label:'تمارا', cls:'success' },
+        { key:'mora', label:'مورا', cls:'success' },
+    ]},
+    { title:'عمولة الشرائح (مستثناة من صافي النظام)', fields:[
+        { key:'simPhones', label:'شرائح هواتف', cls:'info' },
+        { key:'simHuawei', label:'شرائح هواوي', cls:'info' },
+    ]},
+];
+const FIELD_ORDER = FIELD_GROUPS.flatMap(g => g.fields.map(f => f.key));
+
+/* ---------------- Payroll sheet controller ---------------- */
+const Payroll = {
+    calc(emp, rec) {
+        const cr = DB.settings.commRates;
+        const allowedVac = emp.vacations ?? 4;
+        const dailyRate = emp.salary / 30, hourlyRate = dailyRate / (emp.hours || 8);
+        const absDays = parseFloat(rec.absentDays) || 0;
+        const effVac = Math.min(absDays, allowedVac);
+        const effAbs = Math.max(0, absDays - allowedVac);
+        const unusedOffDays = allowedVac - effVac;
+        const unusedOffVal = unusedOffDays * dailyRate;
+        const absenceVal = effAbs * dailyRate;
+        const overTimeVal = (parseFloat(rec.otHours) || 0) * hourlyRate;
+        const delayVal = (parseFloat(rec.delayHours) || 0) * hourlyRate;
+        const comm1 = (rec.tabby * cr.tabby) + (rec.tamara * cr.tamara) + (rec.mora * cr.mora);
+        const comm2 = (rec.simPhones * cr.simRate) + (rec.simHuawei * cr.simRate);
+        const netForSystem = emp.salary + unusedOffVal + overTimeVal + comm1 - absenceVal - delayVal - (rec.advances || 0) - (rec.purchases || 0);
+        const netFinal = netForSystem + comm2 - (rec.shippingCredit || 0);
+        const netBeforeDeductions = emp.salary + unusedOffVal + overTimeVal + comm1 + comm2 - absenceVal - delayVal;
+        return { unusedOffDays, unusedOffVal, effAbs, absenceVal, overTimeVal, delayVal, comm1, comm2, netForSystem, netFinal, netBeforeDeductions };
+    },
+
+    render() {
+        const month = document.getElementById('payrollMonth').value;
+        const table = document.getElementById('payrollSheet');
+        const emps = DB.employees;
+        if (!month) return;
+        if (emps.length === 0) { table.innerHTML = '<tr><td class="empty-state">لا يوجد موظفين بعد — اضغط زر الموظفين أعلى الصفحة لإضافة أول موظف</td></tr>'; return; }
+
+        const recs = emps.map(e => DB.getRecord(e.id, month));
+
+        let html = '<thead><tr><th class="sheet-label">البند</th>';
+        emps.forEach(e => html += `<th class="emp-head" onclick="Payroll.openEmployeeSlip('${e.id}')">${e.name}</th>`);
+        html += '</tr></thead><tbody>';
+
+        html += '<tr class="row-base"><th class="sheet-label">الراتب الأساسي</th>';
+        emps.forEach(e => html += `<td class="cell-neutral" style="padding:9px;">${e.salary.toFixed(0)}</td>`);
+        html += '</tr>';
+
+        FIELD_GROUPS.forEach(g => {
+            html += `<tr class="sheet-group"><td colspan="${emps.length + 1}">${g.title}</td></tr>`;
+            g.fields.forEach(f => {
+                html += `<tr><th class="sheet-label">${f.label}</th>`;
+                emps.forEach((e, ci) => {
+                    const rec = recs[ci];
+                    html += `<td class="sheet-cell cell-${f.cls}"><input type="number" class="sheet-input" value="${rec[f.key] || 0}" data-emp="${e.id}" data-field="${f.key}" data-col="${ci}" onchange="Payroll.update(this)" onkeydown="Payroll.nav(event,this)"></td>`;
+                });
+                html += '</tr>';
+            });
+        });
+
+        html += '<tr class="row-net"><th class="sheet-label">الصافي (بالنسبة للنظام)</th>';
+        emps.forEach((e, ci) => { const r = Payroll.calc(e, recs[ci]); html += `<td id="net-sys-${e.id}">${r.netForSystem.toFixed(0)}</td>`; });
+        html += '</tr>';
+
+        html += '<tr class="row-net-final"><th class="sheet-label">الصافي النهائي</th>';
+        emps.forEach((e, ci) => { const r = Payroll.calc(e, recs[ci]); html += `<td id="net-final-${e.id}">${r.netFinal.toFixed(0)}</td>`; });
+        html += '</tr>';
+
+        html += '</tbody>';
+        table.innerHTML = html;
+    },
+
+    update(input) {
+        const empId = input.dataset.emp, field = input.dataset.field;
+        const month = document.getElementById('payrollMonth').value;
+        DB.updateField(empId, month, field, input.value);
+        Payroll.recalcEmployee(empId, month);
+    },
+
+    recalcEmployee(empId, month) {
+        const emp = DB.employees.find(e => e.id === empId);
+        const rec = DB.getRecord(empId, month);
+        const r = Payroll.calc(emp, rec);
+        const sysEl = document.getElementById('net-sys-' + empId);
+        const finEl = document.getElementById('net-final-' + empId);
+        if (sysEl) sysEl.textContent = r.netForSystem.toFixed(0);
+        if (finEl) finEl.textContent = r.netFinal.toFixed(0);
+    },
+
+    nav(e, input) {
+        if (e.key === 'Enter') { e.preventDefault(); Payroll.moveFocus(input, e.shiftKey ? -1 : 1); }
+        else if (e.key === 'ArrowDown') { e.preventDefault(); Payroll.moveFocus(input, 1); }
+        else if (e.key === 'ArrowUp') { e.preventDefault(); Payroll.moveFocus(input, -1); }
+    },
+
+    moveFocus(input, delta) {
+        const col = input.dataset.col;
+        const idx = FIELD_ORDER.indexOf(input.dataset.field);
+        let newIdx = Math.min(FIELD_ORDER.length - 1, Math.max(0, idx + delta));
+        const target = document.querySelector(`input[data-field="${FIELD_ORDER[newIdx]}"][data-col="${col}"]`);
+        if (target) { target.focus(); target.select(); }
+    },
+
+    buildPrintTable() {
+        const month = document.getElementById('payrollMonth').value;
+        const emps = DB.employees;
+        const recs = emps.map(e => DB.getRecord(e.id, month));
+        let html = `<div class="print-title">مسير الرواتب — <span dir="ltr">${month}</span></div><table class="print-sheet"><thead><tr><th>البند</th>`;
+        emps.forEach(e => html += `<th>${e.name}</th>`);
+        html += '</tr></thead><tbody><tr><td><strong>الراتب الأساسي</strong></td>';
+        emps.forEach(e => html += `<td style="text-align:center;">${e.salary.toFixed(0)}</td>`);
+        html += '</tr>';
+        FIELD_GROUPS.forEach(g => {
+            g.fields.forEach(f => {
+                html += `<tr><td>${f.label}</td>`;
+                emps.forEach((e, ci) => html += `<td style="text-align:center;">${recs[ci][f.key] || 0}</td>`);
+                html += '</tr>';
+            });
+        });
+        html += '<tr class="print-net"><td>الصافي (بالنسبة للنظام)</td>';
+        emps.forEach((e, ci) => { const r = Payroll.calc(e, recs[ci]); html += `<td style="text-align:center;">${r.netForSystem.toFixed(0)}</td>`; });
+        html += '</tr><tr class="print-net-final"><td>الصافي النهائي</td>';
+        emps.forEach((e, ci) => { const r = Payroll.calc(e, recs[ci]); html += `<td style="text-align:center;">${r.netFinal.toFixed(0)}</td>`; });
+        html += '</tr></tbody></table>';
+        return html;
+    },
+
+    print() {
+        if (DB.employees.length === 0) return UI.toast('أضف موظفين أولاً');
+        const month = document.getElementById('payrollMonth').value;
+        document.getElementById('printPreviewContent').innerHTML = DB.employees.map(e => Payroll.generateSlipHTML(e, month)).join('');
+        UI.openModal('printPreviewModal');
+    },
+
+    confirmPrintAll() {
+        const month = document.getElementById('payrollMonth').value;
+        document.getElementById('printArea').innerHTML = DB.employees.map(e => Payroll.generateSlipHTML(e, month)).join('');
+        setTimeout(() => window.print(), 150);
+    },
+
+    generateSlipHTML(emp, month) {
+        const rec = DB.getRecord(emp.id, month);
+        const r = Payroll.calc(emp, rec);
+        const prefs = emp.prefs || {};
+
+        let comm1Arr = [];
+        if (rec.tabby > 0) comm1Arr.push(`${rec.tabby} تابي`);
+        if (rec.tamara > 0) comm1Arr.push(`${rec.tamara} تمارا`);
+        if (rec.mora > 0) comm1Arr.push(`${rec.mora} مورا`);
+        let comm1Text = comm1Arr.length ? comm1Arr.join(' و ') : '-';
+
+        let comm2Arr = [];
+        if (rec.simPhones > 0) comm2Arr.push(`${rec.simPhones} هواتف`);
+        if (rec.simHuawei > 0) comm2Arr.push(`${rec.simHuawei} هواوي`);
+        let comm2Text = comm2Arr.length ? comm2Arr.join(' و ') : '-';
+
+        let html = `<div class="slip-container"><div class="slip-header">${emp.name} <span style="font-size:12px;color:#666;font-weight:normal;">— <span dir="ltr">${month}</span></span></div>
+        <table class="slip-table"><tr class="slip-bg-g-light"><td colspan="2" class="slip-td-right" style="width:77%;">الراتب الأساسي</td><td class="slip-td-left">${emp.salary.toFixed(0)}</td></tr>`;
+
+        if (prefs.showSalCash && rec.salCash > 0) html += `<tr class="slip-bg-g-light slip-sub-item"><td class="slip-td-right">— من الكاش</td><td class="slip-td-sub-val">${rec.salCash.toFixed(0)}</td><td></td></tr>`;
+        if (prefs.showSalTransfer && rec.salTransfer > 0) html += `<tr class="slip-bg-g-light slip-sub-item"><td class="slip-td-right">— من التحويل</td><td class="slip-td-sub-val">${rec.salTransfer.toFixed(0)}</td><td></td></tr>`;
+        if (prefs.showSalDrawer && rec.salDrawer > 0) html += `<tr class="slip-bg-g-light slip-sub-item"><td class="slip-td-right">— من الشحن</td><td class="slip-td-sub-val">${rec.salDrawer.toFixed(0)}</td><td></td></tr>`;
+        if (prefs.showSalTailor && rec.salTailor > 0) html += `<tr class="slip-bg-g-light slip-sub-item"><td class="slip-td-right">— من الخياط</td><td class="slip-td-sub-val">${rec.salTailor.toFixed(0)}</td><td></td></tr>`;
+
+        if (prefs.showUnusedOff && r.unusedOffVal > 0) html += `<tr class="slip-bg-g-light"><td class="slip-td-right">إضافي من الأوف</td><td class="slip-td-center">${r.unusedOffDays} أيام</td><td class="slip-td-left">${r.unusedOffVal.toFixed(0)}</td></tr>`;
+        if (prefs.showOvertime && r.overTimeVal > 0) html += `<tr class="slip-bg-g-light"><td class="slip-td-right">إضافي</td><td class="slip-td-center">${rec.otHours} ساعة</td><td class="slip-td-left">${r.overTimeVal.toFixed(0)}</td></tr>`;
+        if (prefs.showSalesComm && r.comm1 > 0) html += `<tr class="slip-bg-g-light"><td class="slip-td-right">ع. مبيعات</td><td class="slip-td-center">${comm1Text}</td><td class="slip-td-left">${r.comm1.toFixed(0)}</td></tr>`;
+        if (prefs.showSimComm && r.comm2 > 0) html += `<tr class="slip-bg-g-light"><td class="slip-td-right">ع. شرائح</td><td class="slip-td-center">${comm2Text}</td><td class="slip-td-left">${r.comm2.toFixed(0)}</td></tr>`;
+
+        if (prefs.showAbsence && r.absenceVal > 0) html += `<tr class="slip-bg-r-light"><td class="slip-td-right">غياب</td><td class="slip-td-center">${r.effAbs} أيام</td><td class="slip-td-left">${r.absenceVal.toFixed(0)}</td></tr>`;
+        if (prefs.showDelay && r.delayVal > 0) html += `<tr class="slip-bg-r-light"><td class="slip-td-right">تأخير</td><td class="slip-td-center">${rec.delayHours} ساعة</td><td class="slip-td-left">${r.delayVal.toFixed(0)}</td></tr>`;
+
+        html += `<tr class="slip-bg-g-dark"><td colspan="2" class="slip-td-right">صافي المرتب</td><td class="slip-td-left">${r.netBeforeDeductions.toFixed(0)}</td></tr>`;
+
+        if (prefs.showAdvances && rec.advances > 0) html += `<tr class="slip-bg-r-light"><td colspan="2" class="slip-td-right">مسحوبات (سلف)</td><td class="slip-td-left">${rec.advances.toFixed(0)}</td></tr>`;
+        if (prefs.showPurchases && rec.purchases > 0) html += `<tr class="slip-bg-r-light"><td colspan="2" class="slip-td-right">آجل النظام</td><td class="slip-td-left">${rec.purchases.toFixed(0)}</td></tr>`;
+        if (prefs.showShipping && rec.shippingCredit > 0) html += `<tr class="slip-bg-r-light"><td colspan="2" class="slip-td-right">آجل الشحن</td><td class="slip-td-left">${rec.shippingCredit.toFixed(0)}</td></tr>`;
+
+        if (prefs.showFinalNet !== false) html += `<tr class="slip-bg-g-dark"><td colspan="2" class="slip-td-right">المرتب بعد المسحوبات والآجل</td><td class="slip-td-left">${r.netFinal.toFixed(0)}</td></tr>`;
+
+        html += `</table></div>`;
+        return html;
+    },
+
+    openEmployeeSlip(empId) {
+        const month = document.getElementById('payrollMonth').value;
+        const emp = DB.employees.find(e => e.id === empId);
+        if (!emp) return;
+        Payroll._currentSlipEmp = empId;
+        document.getElementById('empSlipTitle').textContent = 'كارت راتب — ' + emp.name;
+        document.getElementById('empSlipContent').innerHTML = Payroll.generateSlipHTML(emp, month);
+        UI.openModal('empSlipModal');
+    },
+
+    printSingle() {
+        const month = document.getElementById('payrollMonth').value;
+        const emp = DB.employees.find(e => e.id === Payroll._currentSlipEmp);
+        if (!emp) return;
+        document.getElementById('printArea').innerHTML = Payroll.generateSlipHTML(emp, month);
+        setTimeout(() => window.print(), 150);
+    },
+
+    exportExcel() {
+        if (DB.employees.length === 0) return UI.toast('أضف موظفين أولاً');
+        const month = document.getElementById('payrollMonth').value;
+        const inner = Payroll.buildPrintTable().replace('print-sheet', 'print-sheet excel-table');
+        const finalHtml = `<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+            <head><meta charset="utf-8"><style>
+                body{direction:rtl;font-family:'Segoe UI',Tahoma,Arial,sans-serif;}
+                table{border-collapse:collapse;width:100%;} table,th,td{border:1px solid #000;} th,td{padding:5px;}
+                .print-net{background:#dcecd0 !important;} .print-net-final{background:#f3e2b0 !important;}
+            </style></head><body>${inner}</body></html>`;
+        const blob = new Blob(['\uFEFF' + finalHtml], { type:'application/vnd.ms-excel;charset=utf-8' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `مسير_الرواتب_${month}.xls`;
+        link.click();
+    }
+};
+
+/* ---------------- Employees controller ---------------- */
+const Employees = {
+    handleSave(e) {
+        e.preventDefault();
+        const id = document.getElementById('editEmpId').value;
+        const name = document.getElementById('empName').value;
+        const salary = parseFloat(document.getElementById('empSalary').value);
+        const hours = parseFloat(document.getElementById('empHours').value);
+        const vacations = parseFloat(document.getElementById('empVacations').value);
+        const prefs = {
+            showSalCash: document.getElementById('prefSalCash').checked,
+            showSalTransfer: document.getElementById('prefSalTransfer').checked,
+            showSalDrawer: document.getElementById('prefSalDrawer').checked,
+            showSalTailor: document.getElementById('prefSalTailor').checked,
+            showUnusedOff: document.getElementById('prefUnusedOff').checked,
+            showOvertime: document.getElementById('prefOvertime').checked,
+            showSalesComm: document.getElementById('prefSalesComm').checked,
+            showSimComm: document.getElementById('prefSimComm').checked,
+            showAbsence: document.getElementById('prefAbsence').checked,
+            showDelay: document.getElementById('prefDelay').checked,
+            showAdvances: document.getElementById('prefAdvances').checked,
+            showPurchases: document.getElementById('prefPurchases').checked,
+            showShipping: document.getElementById('prefShipping').checked,
+            showFinalNet: document.getElementById('prefFinalNet').checked
+        };
+        if (id) {
+            const emp = DB.employees.find(x => x.id === id);
+            Object.assign(emp, { name, salary, hours, vacations, prefs });
+            UI.toast('تم تعديل الموظف');
+        } else {
+            DB.employees.push({ id:'emp_' + Date.now(), name, salary, hours, vacations, prefs });
+            UI.toast('تمت الإضافة');
+        }
+        DB.saveEmployees();
+        Employees.cancelEdit();
+        Employees.render();
+        Payroll.render();
+    },
+
+    loadEdit(id) {
+        const emp = DB.employees.find(e => e.id === id);
+        if (!emp) return;
+        document.getElementById('editEmpId').value = emp.id;
+        document.getElementById('empName').value = emp.name;
+        document.getElementById('empSalary').value = emp.salary;
+        document.getElementById('empHours').value = emp.hours;
+        document.getElementById('empVacations').value = emp.vacations ?? 4;
+        const prefs = emp.prefs || {};
+        ['SalCash','SalTransfer','SalDrawer','SalTailor','UnusedOff','Overtime','SalesComm','SimComm','Absence','Delay','Advances','Purchases','Shipping','FinalNet'].forEach(p => {
+            const el = document.getElementById('pref' + p);
+            if (el) el.checked = prefs['show' + p] !== undefined ? prefs['show' + p] : !p.startsWith('Sal');
+        });
+        document.getElementById('btnSaveEmp').innerHTML = '<span class="material-icons" style="font-size:16px;">save</span> حفظ التعديلات';
+        document.getElementById('btnCancelEmp').classList.remove('hidden');
+        document.getElementById('empForm').scrollIntoView({ behavior:'smooth' });
+    },
+
+    cancelEdit() {
+        document.getElementById('empForm').reset();
+        document.getElementById('editEmpId').value = '';
+        document.getElementById('empHours').value = 8;
+        document.getElementById('empVacations').value = 4;
+        document.getElementById('btnSaveEmp').innerHTML = '<span class="material-icons" style="font-size:16px;">add</span> إضافة موظف';
+        document.getElementById('btnCancelEmp').classList.add('hidden');
+        document.querySelectorAll('#empForm .prefs-group input[type=checkbox]').forEach(cb => cb.checked = !cb.id.startsWith('prefSal'));
+    },
+
+    delete(id) {
+        if (!confirm('تأكيد حذف الموظف؟ سيتم حذف بياناته المالية أيضاً.')) return;
+        DB.employees = DB.employees.filter(e => e.id !== id);
+        DB.records = DB.records.filter(r => r.empId !== id);
+        DB.saveEmployees(); DB.saveRecords();
+        Employees.render();
+        Payroll.render();
+    },
+
+    render() {
+        const el = document.getElementById('empList');
+        if (DB.employees.length === 0) { el.innerHTML = '<p style="font-size:12px;color:var(--text-muted);">لا يوجد موظفين بعد</p>'; return; }
+        el.innerHTML = DB.employees.map(e => `
+            <div class="list-item">
+                <div><strong>${e.name}</strong><div class="meta">${e.salary} — ${e.hours} س/يوم — ${e.vacations ?? 4} يوم إجازة</div></div>
+                <div class="list-item-actions">
+                    <button class="icon-btn" onclick="Employees.loadEdit('${e.id}')"><span class="material-icons" style="font-size:19px;">edit</span></button>
+                    <button class="icon-btn" style="color:var(--danger)" onclick="Employees.delete('${e.id}')"><span class="material-icons" style="font-size:19px;">delete</span></button>
+                </div>
+            </div>`).join('');
+    }
+};
+
+/* ---------------- Settings controller ---------------- */
+const Settings = {
+    render() {
+        const cr = DB.settings.commRates;
+        document.getElementById('crTabby').value = cr.tabby;
+        document.getElementById('crTamara').value = cr.tamara;
+        document.getElementById('crMora').value = cr.mora;
+        document.getElementById('crSim').value = cr.simRate;
+        document.getElementById('darkModeToggle').checked = DB.settings.theme === 'dark';
+    },
+    saveRate(key, val) { DB.settings.commRates[key] = parseFloat(val) || 0; DB.saveSettings(); Payroll.render(); UI.toast('تم الحفظ'); },
+    toggleTheme(isDark) {
+        DB.settings.theme = isDark ? 'dark' : 'light';
+        document.documentElement.setAttribute('data-theme', DB.settings.theme);
+        DB.saveSettings();
+    },
+    backup() {
+        const blob = new Blob([JSON.stringify({ employees: DB.employees, records: DB.records, settings: DB.settings })], { type:'application/json' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `نسخة_احتياطية_${new Date().toISOString().slice(0,10)}.json`;
+        link.click();
+    },
+    restore(e) {
+        const file = e.target.files[0]; if (!file) return;
+        const reader = new FileReader();
+        reader.onload = ev => {
+            try {
+                const data = JSON.parse(ev.target.result);
+                if (data.employees) { DB.employees = data.employees; DB.saveEmployees(); }
+                if (data.records) { DB.records = data.records; DB.saveRecords(); }
+                if (data.settings) { DB.settings = data.settings; DB.saveSettings(); }
+                UI.toast('تم الاسترجاع بنجاح');
+                Employees.render(); Settings.render(); Payroll.render();
+                if (DB.settings.theme) document.documentElement.setAttribute('data-theme', DB.settings.theme);
+            } catch { alert('ملف غير صالح'); }
+        };
+        reader.readAsText(file);
+    },
+    clearAll() {
+        if (!confirm('سيتم مسح كل البيانات نهائياً! هل أنت متأكد؟')) return;
+        localStorage.removeItem('pr_employees'); localStorage.removeItem('pr_records'); localStorage.removeItem('pr_settings');
+        location.reload();
+    }
+};
+
+/* ---------------- Init ---------------- */
+document.addEventListener('DOMContentLoaded', () => {
+    if (DB.settings.theme === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+    document.getElementById('payrollMonth').value = new Date().toISOString().slice(0, 7);
+    document.querySelectorAll('.modal-overlay').forEach(m => m.addEventListener('click', e => { if (e.target === m) m.classList.remove('active'); }));
+    Payroll.render();
+});
+</script>
+</body>
+</html>
