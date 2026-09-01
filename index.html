@@ -70,16 +70,16 @@ input[type=number] { -moz-appearance:textfield; }
 .list-item-actions { display:flex; gap:4px; }
 
 /* Excel-style sheet */
-.sheet-wrap { overflow:auto; border:1px solid var(--border); border-radius:8px; max-height:70vh; }
+.sheet-wrap { overflow-x:auto; overflow-y:visible; border:1px solid var(--border); border-radius:8px; }
 table.sheet { border-collapse:collapse; width:100%; }
 .sheet th, .sheet td { border:1px solid var(--border); white-space:nowrap; }
 .sheet thead th { position:sticky; top:0; z-index:4; }
-.sheet-label { text-align:right; padding:9px 10px; font-size:12.5px; font-weight:600; background:var(--card-bg); position:sticky; right:0; z-index:2; min-width:130px; }
+.sheet-label { text-align:right; padding:8px 4px; font-size:11.5px; font-weight:600; background:var(--card-bg); position:sticky; right:0; z-index:2; min-width:44px; }
 .sheet thead .sheet-label { z-index:5; background:var(--card-bg); }
-th.emp-head { background:var(--head-bg); padding:10px 8px; font-size:13px; font-weight:800; text-align:center; min-width:100px; color:var(--text-main); cursor:pointer; }
+th.emp-head { background:var(--head-bg); padding:8px 5px; font-size:12px; font-weight:800; text-align:center; min-width:65px; color:var(--text-main); cursor:pointer; }
 th.emp-head:active { opacity:.7; }
 .sheet-cell { padding:0; text-align:center; }
-.sheet-input { width:100%; height:100%; min-height:40px; border:none; text-align:center; font-size:13px; background:transparent; padding:9px 4px; color:var(--text-main); font-family:inherit; }
+.sheet-input { width:100%; height:100%; min-height:38px; border:none; text-align:center; font-size:12px; background:transparent; padding:8px 2px; color:var(--text-main); font-family:inherit; }
 .sheet-input:focus { outline:2px solid var(--primary); outline-offset:-2px; background:var(--card-bg); }
 .cell-neutral { background:var(--card-bg); }
 .cell-danger { background:var(--red-light); }
@@ -122,6 +122,27 @@ tr.row-net-final td, tr.row-net-final th { background:var(--gold-dark); color:#f
 .slip-sub-item .slip-td-right { padding-right:26px !important; font-weight:normal; }
 .slip-td-sub-val { text-align:left; padding-left:18px; font-size:13px; font-family:Arial, sans-serif; width:38%; color:#666; }
 
+/* Attendance (check-in/out) table */
+.att-wrap { max-height:360px; overflow:auto; border:1px solid var(--border); border-radius:8px; }
+table.att-table { border-collapse:collapse; width:100%; font-size:11.5px; }
+.att-table th, .att-table td { border:1px solid var(--border); padding:0; text-align:center; white-space:nowrap; }
+.att-table thead th { position:sticky; top:0; z-index:3; background:var(--head-bg); padding:7px 4px; font-size:11.5px; font-weight:800; color:var(--text-main); }
+.att-day, .att-date { padding:6px 4px; font-weight:600; background:var(--card-bg); }
+.att-input { width:100%; min-width:52px; height:100%; min-height:32px; border:none; text-align:center; font-size:11.5px; background:transparent; padding:6px 2px; color:var(--text-main); font-family:inherit; }
+.att-input:focus { outline:2px solid var(--primary); outline-offset:-2px; background:var(--card-bg); }
+td.att-in, td.att-out { background:var(--green-light); }
+td.att-brk { background:var(--red-light); }
+td.att-total-cell { background:var(--green-light); font-weight:700; padding:6px 4px; }
+.att-table tfoot td { font-weight:800; padding:8px 6px; font-size:11.5px; }
+.att-sum-g td { background:var(--green-dark); color:#fff; }
+.att-sum-r td { background:var(--danger); color:#fff; }
+
+.print-page-title { text-align:center; font-size:17px; font-weight:bold; background:#eaf1e3; border:1px solid #000; border-radius:6px; padding:9px; margin-bottom:12px; color:#000; }
+.print-cards-grid { display:grid; grid-template-columns:repeat(3, minmax(200px, 1fr)); gap:10px; }
+.print-cards-grid .slip-container { margin-bottom:0; }
+#printPreviewContent { overflow-x:auto; }
+#printPreviewContent .print-cards-grid { min-width:620px; }
+
 #printArea { display:none; }
 @media print {
     body * { visibility:hidden; }
@@ -135,6 +156,8 @@ tr.row-net-final td, tr.row-net-final th { background:var(--gold-dark); color:#f
     .print-net-final { background:#f3e2b0 !important; -webkit-print-color-adjust:exact; print-color-adjust:exact; font-weight:bold; }
     .slip-bg-g-light, .slip-bg-r-light, .slip-bg-g-dark { -webkit-print-color-adjust:exact; print-color-adjust:exact; }
     .slip-container { page-break-inside:avoid; margin-bottom:10px; }
+    .print-page-title { -webkit-print-color-adjust:exact; print-color-adjust:exact; page-break-after:avoid; }
+    .print-cards-grid { grid-template-columns:repeat(3, 1fr); }
 }
 </style>
 </head>
@@ -238,6 +261,11 @@ tr.row-net-final td, tr.row-net-final th { background:var(--gold-dark); color:#f
             <label><input type="checkbox" id="darkModeToggle" onchange="Settings.toggleTheme(this.checked)"> الوضع الليلي</label>
         </div>
 
+        <div class="prefs-title">الطباعة</div>
+        <div class="prefs-group">
+            <label><input type="checkbox" id="cleanPrintToggle" onchange="Settings.toggleCleanPrint(this.checked)"> طباعة نظيفة (إخفاء البنود الصفرية من الكروت)</label>
+        </div>
+
         <div class="prefs-title">البيانات</div>
         <div style="display:flex; gap:8px; flex-wrap:wrap;">
             <button class="btn btn-outline btn-sm" onclick="Settings.backup()"><span class="material-icons" style="font-size:16px;">download</span> نسخ احتياطي</button>
@@ -256,6 +284,8 @@ tr.row-net-final td, tr.row-net-final th { background:var(--gold-dark); color:#f
             <button class="modal-close" onclick="UI.closeModal('empSlipModal')"><span class="material-icons">close</span></button>
         </div>
         <div id="empSlipContent"></div>
+        <h3 style="font-size:13px; margin:16px 0 8px; color:var(--text-muted);">سجل الحضور والانصراف</h3>
+        <div id="empAttendanceContent"></div>
         <button class="btn btn-info btn-block mt-10" onclick="Payroll.printSingle()"><span class="material-icons" style="font-size:16px;">print</span> طباعة الكارت</button>
     </div>
 </div>
@@ -284,9 +314,11 @@ const LS = {
 const DB = {
     employees: LS.get('pr_employees', []),
     records: LS.get('pr_records', []),
-    settings: LS.get('pr_settings', { commRates:{ tabby:20, tamara:20, mora:100, simRate:5 }, theme:'light' }),
+    attendance: LS.get('pr_attendance', []),
+    settings: LS.get('pr_settings', { commRates:{ tabby:20, tamara:20, mora:100, simRate:5 }, theme:'light', cleanPrint:false }),
     saveEmployees() { LS.set('pr_employees', this.employees); },
     saveRecords() { LS.set('pr_records', this.records); },
+    saveAttendance() { LS.set('pr_attendance', this.attendance); },
     saveSettings() { LS.set('pr_settings', this.settings); },
     getRecord(empId, month) {
         let r = this.records.find(x => x.empId === empId && x.month === month);
@@ -299,6 +331,25 @@ const DB = {
         if (idx > -1) { this.records[idx][field] = val; }
         else { let r = this.getRecord(empId, month); r[field] = val; this.records.push(r); }
         this.saveRecords();
+    },
+    defaultDayAttendance(emp) {
+        const startDec = 16; // 4:00 PM
+        const endDec = (startDec + (emp.hours || 8)) % 24;
+        return { in: Attendance.decToTime(startDec), bOut:'', bIn:'', out: Attendance.decToTime(endDec) };
+    },
+    getAttendance(empId, month) {
+        let rec = this.attendance.find(x => x.empId === empId && x.month === month);
+        if (!rec) {
+            const emp = this.employees.find(e => e.id === empId);
+            const [y, m] = month.split('-').map(Number);
+            const daysInMonth = new Date(y, m, 0).getDate();
+            const days = {};
+            for (let d = 1; d <= daysInMonth; d++) days[d] = this.defaultDayAttendance(emp);
+            rec = { empId, month, days };
+            this.attendance.push(rec);
+            this.saveAttendance();
+        }
+        return rec;
     }
 };
 if (!DB.settings.commRates) DB.settings.commRates = { tabby:20, tamara:20, mora:100, simRate:5 };
@@ -313,9 +364,9 @@ const UI = {
 /* ---------------- Field definitions for the sheet ---------------- */
 const FIELD_GROUPS = [
     { title:'بيانات الحضور (تُدخل يدوياً من سجل الإكسيل)', fields:[
-        { key:'absentDays', label:'أيام الغياب/الإجازة', cls:'neutral' },
-        { key:'otHours', label:'ساعات الإضافي', cls:'neutral' },
-        { key:'delayHours', label:'ساعات التأخير', cls:'neutral' },
+        { key:'absentDays', label:'الغياب', cls:'neutral' },
+        { key:'otHours', label:'الإضافي', cls:'neutral', isTime:true },
+        { key:'delayHours', label:'التأخير', cls:'neutral', isTime:true },
     ]},
     { title:'مصدر صرف الراتب الأساسي', fields:[
         { key:'salCash', label:'كاش', cls:'neutral' },
@@ -385,17 +436,20 @@ const Payroll = {
                 html += `<tr><th class="sheet-label">${f.label}</th>`;
                 emps.forEach((e, ci) => {
                     const rec = recs[ci];
-                    html += `<td class="sheet-cell cell-${f.cls}"><input type="number" class="sheet-input" value="${rec[f.key] || 0}" data-emp="${e.id}" data-field="${f.key}" data-col="${ci}" onchange="Payroll.update(this)" onkeydown="Payroll.nav(event,this)"></td>`;
+                    const dispVal = f.isTime ? Payroll.formatHM(rec[f.key]) : (rec[f.key] || 0);
+                    const inputType = f.isTime ? 'text' : 'number';
+                    const extraAttrs = f.isTime ? ' inputmode="numeric" placeholder="0:00" data-type="time"' : '';
+                    html += `<td class="sheet-cell cell-${f.cls}"><input type="${inputType}" class="sheet-input" value="${dispVal}" data-emp="${e.id}" data-field="${f.key}" data-col="${ci}"${extraAttrs} onchange="Payroll.update(this)" onkeydown="Payroll.nav(event,this)"></td>`;
                 });
                 html += '</tr>';
             });
         });
 
-        html += '<tr class="row-net"><th class="sheet-label">الصافي (بالنسبة للنظام)</th>';
+        html += '<tr class="row-net"><th class="sheet-label">الصافي</th>';
         emps.forEach((e, ci) => { const r = Payroll.calc(e, recs[ci]); html += `<td id="net-sys-${e.id}">${r.netForSystem.toFixed(0)}</td>`; });
         html += '</tr>';
 
-        html += '<tr class="row-net-final"><th class="sheet-label">الصافي النهائي</th>';
+        html += '<tr class="row-net-final"><th class="sheet-label">النهائي</th>';
         emps.forEach((e, ci) => { const r = Payroll.calc(e, recs[ci]); html += `<td id="net-final-${e.id}">${r.netFinal.toFixed(0)}</td>`; });
         html += '</tr>';
 
@@ -403,10 +457,34 @@ const Payroll = {
         table.innerHTML = html;
     },
 
+    parseHM(val) {
+        if (val === null || val === undefined || val === '') return 0;
+        val = String(val).trim();
+        if (val.includes(':')) {
+            const parts = val.split(':');
+            const h = parseInt(parts[0], 10) || 0;
+            const m = parseInt(parts[1], 10) || 0;
+            return h + (m / 60);
+        }
+        return parseFloat(val) || 0;
+    },
+
+    formatHM(decimalHours) {
+        const dh = parseFloat(decimalHours) || 0;
+        const h = Math.floor(dh);
+        const m = Math.round((dh - h) * 60);
+        return `${h}:${String(m).padStart(2, '0')}`;
+    },
+
     update(input) {
         const empId = input.dataset.emp, field = input.dataset.field;
         const month = document.getElementById('payrollMonth').value;
-        DB.updateField(empId, month, field, input.value);
+        let val = input.value;
+        if (input.dataset.type === 'time') {
+            val = Payroll.parseHM(val);
+            input.value = Payroll.formatHM(val);
+        }
+        DB.updateField(empId, month, field, val);
         Payroll.recalcEmployee(empId, month);
     },
 
@@ -450,28 +528,48 @@ const Payroll = {
                 html += '</tr>';
             });
         });
-        html += '<tr class="print-net"><td>الصافي (بالنسبة للنظام)</td>';
+        html += '<tr class="print-net"><td>الصافي</td>';
         emps.forEach((e, ci) => { const r = Payroll.calc(e, recs[ci]); html += `<td style="text-align:center;">${r.netForSystem.toFixed(0)}</td>`; });
-        html += '</tr><tr class="print-net-final"><td>الصافي النهائي</td>';
+        html += '</tr><tr class="print-net-final"><td>النهائي</td>';
         emps.forEach((e, ci) => { const r = Payroll.calc(e, recs[ci]); html += `<td style="text-align:center;">${r.netFinal.toFixed(0)}</td>`; });
         html += '</tr></tbody></table>';
         return html;
     },
 
+    monthLabel(monthStr) {
+        if (!monthStr) return '';
+        const [y, m] = monthStr.split('-');
+        const names = ['يناير', 'فبراير', 'مارس', 'إبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
+        const idx = parseInt(m, 10) - 1;
+        return `${names[idx] || ''} ${y}`;
+    },
+
+    buildCardsPage(month) {
+        const cards = DB.employees.map(e => Payroll.generateSlipHTML(e, month, false)).join('');
+        return `<div class="print-page-title">مسير الرواتب لشهر: ${Payroll.monthLabel(month)}</div><div class="print-cards-grid">${cards}</div>`;
+    },
+
     print() {
         if (DB.employees.length === 0) return UI.toast('أضف موظفين أولاً');
         const month = document.getElementById('payrollMonth').value;
-        document.getElementById('printPreviewContent').innerHTML = DB.employees.map(e => Payroll.generateSlipHTML(e, month)).join('');
+        document.getElementById('printPreviewContent').innerHTML = Payroll.buildCardsPage(month);
         UI.openModal('printPreviewModal');
     },
 
     confirmPrintAll() {
         const month = document.getElementById('payrollMonth').value;
-        document.getElementById('printArea').innerHTML = DB.employees.map(e => Payroll.generateSlipHTML(e, month)).join('');
-        setTimeout(() => window.print(), 150);
+        document.getElementById('printArea').innerHTML = Payroll.buildCardsPage(month);
+        Payroll._withPrintTitle(`رواتب (${Payroll.monthLabel(month)})`);
     },
 
-    generateSlipHTML(emp, month) {
+    _withPrintTitle(title) {
+        const prevTitle = document.title;
+        document.title = title;
+        setTimeout(() => window.print(), 150);
+        window.onafterprint = () => { document.title = prevTitle; window.onafterprint = null; };
+    },
+
+    generateSlipHTML(emp, month, showMonthInHeader = true) {
         const rec = DB.getRecord(emp.id, month);
         const r = Payroll.calc(emp, rec);
         const prefs = emp.prefs || {};
@@ -487,27 +585,29 @@ const Payroll = {
         if (rec.simHuawei > 0) comm2Arr.push(`${rec.simHuawei} هواوي`);
         let comm2Text = comm2Arr.length ? comm2Arr.join(' و ') : '-';
 
-        let html = `<div class="slip-container"><div class="slip-header">${emp.name} <span style="font-size:12px;color:#666;font-weight:normal;">— <span dir="ltr">${month}</span></span></div>
+        const cleanPrint = !!DB.settings.cleanPrint;
+        const headerSub = showMonthInHeader ? ` <span style="font-size:12px;color:#666;font-weight:normal;">— <span dir="ltr">${month}</span></span>` : '';
+        let html = `<div class="slip-container"><div class="slip-header">${emp.name}${headerSub}</div>
         <table class="slip-table"><tr class="slip-bg-g-light"><td colspan="2" class="slip-td-right" style="width:77%;">الراتب الأساسي</td><td class="slip-td-left">${emp.salary.toFixed(0)}</td></tr>`;
 
-        if (prefs.showSalCash && rec.salCash > 0) html += `<tr class="slip-bg-g-light slip-sub-item"><td class="slip-td-right">— من الكاش</td><td class="slip-td-sub-val">${rec.salCash.toFixed(0)}</td><td></td></tr>`;
-        if (prefs.showSalTransfer && rec.salTransfer > 0) html += `<tr class="slip-bg-g-light slip-sub-item"><td class="slip-td-right">— من التحويل</td><td class="slip-td-sub-val">${rec.salTransfer.toFixed(0)}</td><td></td></tr>`;
-        if (prefs.showSalDrawer && rec.salDrawer > 0) html += `<tr class="slip-bg-g-light slip-sub-item"><td class="slip-td-right">— من الشحن</td><td class="slip-td-sub-val">${rec.salDrawer.toFixed(0)}</td><td></td></tr>`;
-        if (prefs.showSalTailor && rec.salTailor > 0) html += `<tr class="slip-bg-g-light slip-sub-item"><td class="slip-td-right">— من الخياط</td><td class="slip-td-sub-val">${rec.salTailor.toFixed(0)}</td><td></td></tr>`;
+        if (prefs.showSalCash && (!cleanPrint || rec.salCash > 0)) html += `<tr class="slip-bg-g-light slip-sub-item"><td class="slip-td-right">— من الكاش</td><td class="slip-td-sub-val">${rec.salCash.toFixed(0)}</td><td></td></tr>`;
+        if (prefs.showSalTransfer && (!cleanPrint || rec.salTransfer > 0)) html += `<tr class="slip-bg-g-light slip-sub-item"><td class="slip-td-right">— من التحويل</td><td class="slip-td-sub-val">${rec.salTransfer.toFixed(0)}</td><td></td></tr>`;
+        if (prefs.showSalDrawer && (!cleanPrint || rec.salDrawer > 0)) html += `<tr class="slip-bg-g-light slip-sub-item"><td class="slip-td-right">— من الشحن</td><td class="slip-td-sub-val">${rec.salDrawer.toFixed(0)}</td><td></td></tr>`;
+        if (prefs.showSalTailor && (!cleanPrint || rec.salTailor > 0)) html += `<tr class="slip-bg-g-light slip-sub-item"><td class="slip-td-right">— من الخياط</td><td class="slip-td-sub-val">${rec.salTailor.toFixed(0)}</td><td></td></tr>`;
 
-        if (prefs.showUnusedOff && r.unusedOffVal > 0) html += `<tr class="slip-bg-g-light"><td class="slip-td-right">إضافي من الأوف</td><td class="slip-td-center">${r.unusedOffDays} أيام</td><td class="slip-td-left">${r.unusedOffVal.toFixed(0)}</td></tr>`;
-        if (prefs.showOvertime && r.overTimeVal > 0) html += `<tr class="slip-bg-g-light"><td class="slip-td-right">إضافي</td><td class="slip-td-center">${rec.otHours} ساعة</td><td class="slip-td-left">${r.overTimeVal.toFixed(0)}</td></tr>`;
-        if (prefs.showSalesComm && r.comm1 > 0) html += `<tr class="slip-bg-g-light"><td class="slip-td-right">ع. مبيعات</td><td class="slip-td-center">${comm1Text}</td><td class="slip-td-left">${r.comm1.toFixed(0)}</td></tr>`;
-        if (prefs.showSimComm && r.comm2 > 0) html += `<tr class="slip-bg-g-light"><td class="slip-td-right">ع. شرائح</td><td class="slip-td-center">${comm2Text}</td><td class="slip-td-left">${r.comm2.toFixed(0)}</td></tr>`;
+        if (prefs.showUnusedOff && (!cleanPrint || r.unusedOffVal > 0)) html += `<tr class="slip-bg-g-light"><td class="slip-td-right">إضافي من الأوف</td><td class="slip-td-center">${r.unusedOffDays} أيام</td><td class="slip-td-left">${r.unusedOffVal.toFixed(0)}</td></tr>`;
+        if (prefs.showOvertime && (!cleanPrint || r.overTimeVal > 0)) html += `<tr class="slip-bg-g-light"><td class="slip-td-right">إضافي</td><td class="slip-td-center">${Payroll.formatHM(rec.otHours)} ساعة</td><td class="slip-td-left">${r.overTimeVal.toFixed(0)}</td></tr>`;
+        if (prefs.showSalesComm && (!cleanPrint || r.comm1 > 0)) html += `<tr class="slip-bg-g-light"><td class="slip-td-right">ع. مبيعات</td><td class="slip-td-center">${comm1Text}</td><td class="slip-td-left">${r.comm1.toFixed(0)}</td></tr>`;
+        if (prefs.showSimComm && (!cleanPrint || r.comm2 > 0)) html += `<tr class="slip-bg-g-light"><td class="slip-td-right">ع. شرائح</td><td class="slip-td-center">${comm2Text}</td><td class="slip-td-left">${r.comm2.toFixed(0)}</td></tr>`;
 
-        if (prefs.showAbsence && r.absenceVal > 0) html += `<tr class="slip-bg-r-light"><td class="slip-td-right">غياب</td><td class="slip-td-center">${r.effAbs} أيام</td><td class="slip-td-left">${r.absenceVal.toFixed(0)}</td></tr>`;
-        if (prefs.showDelay && r.delayVal > 0) html += `<tr class="slip-bg-r-light"><td class="slip-td-right">تأخير</td><td class="slip-td-center">${rec.delayHours} ساعة</td><td class="slip-td-left">${r.delayVal.toFixed(0)}</td></tr>`;
+        if (prefs.showAbsence && (!cleanPrint || r.absenceVal > 0)) html += `<tr class="slip-bg-r-light"><td class="slip-td-right">غياب</td><td class="slip-td-center">${r.effAbs} أيام</td><td class="slip-td-left">${r.absenceVal.toFixed(0)}</td></tr>`;
+        if (prefs.showDelay && (!cleanPrint || r.delayVal > 0)) html += `<tr class="slip-bg-r-light"><td class="slip-td-right">تأخير</td><td class="slip-td-center">${Payroll.formatHM(rec.delayHours)} ساعة</td><td class="slip-td-left">${r.delayVal.toFixed(0)}</td></tr>`;
 
         html += `<tr class="slip-bg-g-dark"><td colspan="2" class="slip-td-right">صافي المرتب</td><td class="slip-td-left">${r.netBeforeDeductions.toFixed(0)}</td></tr>`;
 
-        if (prefs.showAdvances && rec.advances > 0) html += `<tr class="slip-bg-r-light"><td colspan="2" class="slip-td-right">مسحوبات (سلف)</td><td class="slip-td-left">${rec.advances.toFixed(0)}</td></tr>`;
-        if (prefs.showPurchases && rec.purchases > 0) html += `<tr class="slip-bg-r-light"><td colspan="2" class="slip-td-right">آجل النظام</td><td class="slip-td-left">${rec.purchases.toFixed(0)}</td></tr>`;
-        if (prefs.showShipping && rec.shippingCredit > 0) html += `<tr class="slip-bg-r-light"><td colspan="2" class="slip-td-right">آجل الشحن</td><td class="slip-td-left">${rec.shippingCredit.toFixed(0)}</td></tr>`;
+        if (prefs.showAdvances && (!cleanPrint || rec.advances > 0)) html += `<tr class="slip-bg-r-light"><td colspan="2" class="slip-td-right">مسحوبات (سلف)</td><td class="slip-td-left">${rec.advances.toFixed(0)}</td></tr>`;
+        if (prefs.showPurchases && (!cleanPrint || rec.purchases > 0)) html += `<tr class="slip-bg-r-light"><td colspan="2" class="slip-td-right">آجل النظام</td><td class="slip-td-left">${rec.purchases.toFixed(0)}</td></tr>`;
+        if (prefs.showShipping && (!cleanPrint || rec.shippingCredit > 0)) html += `<tr class="slip-bg-r-light"><td colspan="2" class="slip-td-right">آجل الشحن</td><td class="slip-td-left">${rec.shippingCredit.toFixed(0)}</td></tr>`;
 
         if (prefs.showFinalNet !== false) html += `<tr class="slip-bg-g-dark"><td colspan="2" class="slip-td-right">المرتب بعد المسحوبات والآجل</td><td class="slip-td-left">${r.netFinal.toFixed(0)}</td></tr>`;
 
@@ -521,7 +621,11 @@ const Payroll = {
         if (!emp) return;
         Payroll._currentSlipEmp = empId;
         document.getElementById('empSlipTitle').textContent = 'كارت راتب — ' + emp.name;
+        Attendance.syncToPayroll(emp, month);
         document.getElementById('empSlipContent').innerHTML = Payroll.generateSlipHTML(emp, month);
+        document.getElementById('empAttendanceContent').innerHTML = Attendance.render(emp, month);
+        Payroll.recalcEmployee(empId, month);
+        Attendance.refreshSheetInputs(empId);
         UI.openModal('empSlipModal');
     },
 
@@ -530,7 +634,7 @@ const Payroll = {
         const emp = DB.employees.find(e => e.id === Payroll._currentSlipEmp);
         if (!emp) return;
         document.getElementById('printArea').innerHTML = Payroll.generateSlipHTML(emp, month);
-        setTimeout(() => window.print(), 150);
+        Payroll._withPrintTitle(`راتب ${emp.name} (${Payroll.monthLabel(month)})`);
     },
 
     exportExcel() {
@@ -548,6 +652,137 @@ const Payroll = {
         link.href = URL.createObjectURL(blob);
         link.download = `مسير_الرواتب_${month}.xls`;
         link.click();
+    }
+};
+
+/* ---------------- Attendance controller (daily check-in/out log) ---------------- */
+const Attendance = {
+    timeToDec(t) {
+        if (!t) return null;
+        const parts = String(t).split(':');
+        const h = parseInt(parts[0], 10);
+        const m = parseInt(parts[1], 10) || 0;
+        if (isNaN(h)) return null;
+        return h + (m / 60);
+    },
+
+    decToTime(dec) {
+        if (dec === null || dec === undefined || isNaN(dec)) return '';
+        let d = ((dec % 24) + 24) % 24;
+        const h = Math.floor(d), m = Math.round((d - h) * 60);
+        return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+    },
+
+    dayName(y, m, d) {
+        const names = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+        return names[new Date(y, m - 1, d).getDay()];
+    },
+
+    computeDayTotal(day) {
+        const inDec = Attendance.timeToDec(day.in);
+        const outDec = Attendance.timeToDec(day.out);
+        if (inDec === null || outDec === null) return 0;
+        let total = outDec - inDec;
+        if (total < 0) total += 24;
+        const bOutDec = Attendance.timeToDec(day.bOut);
+        const bInDec = Attendance.timeToDec(day.bIn);
+        if (bOutDec !== null && bInDec !== null) total -= Math.abs(bInDec - bOutDec);
+        return Math.max(0, total);
+    },
+
+    computeMonthSummary(emp, month) {
+        const rec = DB.getAttendance(emp.id, month);
+        const dayNums = Object.keys(rec.days).map(Number).sort((a, b) => a - b);
+        let totalHours = 0, presentDays = 0;
+        dayNums.forEach(d => {
+            const day = rec.days[d];
+            if (day.in) { presentDays++; totalHours += Attendance.computeDayTotal(day); }
+        });
+        const offDays = dayNums.length - presentDays;
+        const quota = presentDays * (emp.hours || 8);
+        const delayAgg = Math.max(0, quota - totalHours);
+        const otAgg = Math.max(0, totalHours - quota);
+        return { totalDays: dayNums.length, presentDays, offDays, totalHours, quota, delayAgg, otAgg };
+    },
+
+    syncToPayroll(emp, month) {
+        const s = Attendance.computeMonthSummary(emp, month);
+        DB.updateField(emp.id, month, 'absentDays', s.offDays);
+        DB.updateField(emp.id, month, 'delayHours', s.delayAgg);
+        DB.updateField(emp.id, month, 'otHours', s.otAgg);
+    },
+
+    render(emp, month) {
+        const rec = DB.getAttendance(emp.id, month);
+        const [y, m] = month.split('-').map(Number);
+        const dayNums = Object.keys(rec.days).map(Number).sort((a, b) => a - b);
+
+        let html = `<div class="att-wrap"><table class="att-table"><thead>
+        <tr><th>اليوم</th><th>التاريخ</th><th class="att-in">حضور</th><th colspan="2" class="att-brk">راحة</th><th class="att-out">انصراف</th><th class="att-tot">إجمالي</th></tr>
+        </thead><tbody>`;
+
+        dayNums.forEach(d => {
+            const day = rec.days[d];
+            const total = Attendance.computeDayTotal(day);
+            html += `<tr>
+                <td class="att-day">${Attendance.dayName(y, m, d)}</td>
+                <td class="att-date">${d}</td>
+                <td class="att-in"><input type="text" class="att-input" value="${day.in}" placeholder="--:--" data-emp="${emp.id}" data-month="${month}" data-day="${d}" data-field="in" onchange="Attendance.update(this)"></td>
+                <td class="att-brk"><input type="text" class="att-input" value="${day.bOut}" placeholder="--:--" data-emp="${emp.id}" data-month="${month}" data-day="${d}" data-field="bOut" onchange="Attendance.update(this)"></td>
+                <td class="att-brk"><input type="text" class="att-input" value="${day.bIn}" placeholder="--:--" data-emp="${emp.id}" data-month="${month}" data-day="${d}" data-field="bIn" onchange="Attendance.update(this)"></td>
+                <td class="att-out"><input type="text" class="att-input" value="${day.out}" placeholder="--:--" data-emp="${emp.id}" data-month="${month}" data-day="${d}" data-field="out" onchange="Attendance.update(this)"></td>
+                <td class="att-tot att-total-cell">${Payroll.formatHM(total)}</td>
+            </tr>`;
+        });
+
+        const s = Attendance.computeMonthSummary(emp, month);
+        html += `</tbody><tfoot>
+            <tr class="att-sum-g"><td colspan="3">إجمالي الساعات</td><td colspan="2" id="att-total-hours">${Payroll.formatHM(s.totalHours)}</td><td>الحضور</td><td id="att-present">${s.presentDays}</td></tr>
+            <tr class="att-sum-r"><td colspan="3">تأخير</td><td colspan="2" id="att-delay">${Payroll.formatHM(s.delayAgg)}</td><td>Off</td><td id="att-off">${s.offDays}</td></tr>
+            <tr class="att-sum-g"><td colspan="3">نصاب العمل</td><td colspan="2" id="att-quota">${Payroll.formatHM(s.quota)}</td><td colspan="2">${emp.name}</td></tr>
+        </tfoot></table></div>`;
+        return html;
+    },
+
+    update(input) {
+        const empId = input.dataset.emp, month = input.dataset.month, day = input.dataset.day, field = input.dataset.field;
+        const rec = DB.getAttendance(empId, month);
+        let val = input.value.trim();
+        if (val) {
+            const dec = Attendance.timeToDec(val);
+            if (dec === null) { input.value = rec.days[day][field]; return; }
+            val = Attendance.decToTime(dec);
+        }
+        rec.days[day][field] = val;
+        DB.saveAttendance();
+        input.value = val;
+
+        const total = Attendance.computeDayTotal(rec.days[day]);
+        const row = input.closest('tr');
+        row.querySelector('.att-total-cell').textContent = Payroll.formatHM(total);
+
+        const emp = DB.employees.find(e => e.id === empId);
+        const s = Attendance.computeMonthSummary(emp, month);
+        document.getElementById('att-total-hours').textContent = Payroll.formatHM(s.totalHours);
+        document.getElementById('att-present').textContent = s.presentDays;
+        document.getElementById('att-delay').textContent = Payroll.formatHM(s.delayAgg);
+        document.getElementById('att-off').textContent = s.offDays;
+        document.getElementById('att-quota').textContent = Payroll.formatHM(s.quota);
+
+        Attendance.syncToPayroll(emp, month);
+        Payroll.recalcEmployee(empId, month);
+        document.getElementById('empSlipContent').innerHTML = Payroll.generateSlipHTML(emp, month);
+        Attendance.refreshSheetInputs(empId);
+    },
+
+    refreshSheetInputs(empId) {
+        const month = document.getElementById('payrollMonth').value;
+        const rec = DB.getRecord(empId, month);
+        ['absentDays', 'otHours', 'delayHours'].forEach(f => {
+            const el = document.querySelector(`input[data-emp="${empId}"][data-field="${f}"]`);
+            if (!el) return;
+            el.value = (f === 'absentDays') ? (rec[f] || 0) : Payroll.formatHM(rec[f]);
+        });
     }
 };
 
@@ -650,11 +885,16 @@ const Settings = {
         document.getElementById('crMora').value = cr.mora;
         document.getElementById('crSim').value = cr.simRate;
         document.getElementById('darkModeToggle').checked = DB.settings.theme === 'dark';
+        document.getElementById('cleanPrintToggle').checked = !!DB.settings.cleanPrint;
     },
     saveRate(key, val) { DB.settings.commRates[key] = parseFloat(val) || 0; DB.saveSettings(); Payroll.render(); UI.toast('تم الحفظ'); },
     toggleTheme(isDark) {
         DB.settings.theme = isDark ? 'dark' : 'light';
         document.documentElement.setAttribute('data-theme', DB.settings.theme);
+        DB.saveSettings();
+    },
+    toggleCleanPrint(isClean) {
+        DB.settings.cleanPrint = isClean;
         DB.saveSettings();
     },
     backup() {
