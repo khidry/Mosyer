@@ -63,6 +63,10 @@ input[type=number] { -moz-appearance:textfield; }
 .prefs-group { display:flex; flex-wrap:wrap; gap:8px 14px; padding:10px; background:var(--bg-color); border-radius:8px; border:1px solid var(--border); margin-bottom:10px; }
 .prefs-group label { display:flex; align-items:center; gap:6px; font-size:12px; font-weight:600; cursor:pointer; margin:0; width:calc(50% - 7px); }
 .prefs-group input[type=checkbox] { width:16px; height:16px; margin:0; flex-shrink:0; }
+.drag-handle { cursor:grab; touch-action:none; user-select:none; -webkit-user-select:none; color:var(--text-muted); display:flex; align-items:center; padding:6px 2px 6px 8px; }
+.list-item { touch-action:pan-y; }
+.list-item > .emp-info { flex:1; min-width:0; }
+.list-item.dragging { opacity:.9; box-shadow:0 6px 16px rgba(0,0,0,.25); position:relative; z-index:5; background:var(--card-bg); outline:2px solid var(--primary); }
 .prefs-title { font-size:12px; font-weight:bold; color:var(--primary); margin:10px 0 6px; }
 
 /* Fixed sources inputs */
@@ -76,7 +80,8 @@ input[type=number] { -moz-appearance:textfield; }
 .list-item-actions { display:flex; gap:4px; }
 
 /* Excel-style sheet */
-.sheet-wrap { overflow-x:auto; overflow-y:visible; border:1px solid var(--border); border-radius:8px; }
+.sheet-wrap { position:sticky; top:var(--hdr, 56px); overflow:auto; max-height:calc(100vh - var(--hdr, 56px) - 64px); max-height:calc(100dvh - var(--hdr, 56px) - 64px); border:1px solid var(--border); border-radius:8px; -webkit-overflow-scrolling:touch; }
+.sheet thead th { box-shadow:0 1px 0 var(--border); }
 table.sheet { border-collapse:collapse; width:100%; }
 .sheet th, .sheet td { border:1px solid var(--border); white-space:nowrap; }
 .sheet thead th { position:sticky; top:0; z-index:4; }
@@ -154,6 +159,7 @@ td.att-total-cell { background:var(--green-light); font-weight:700; padding:6px 
 
 #printArea { display:none; }
 @media print {
+    .sheet-wrap { max-height:none !important; overflow:visible !important; }
     body * { visibility:hidden; }
     #printArea, #printArea * { visibility:visible; }
     #printArea { display:block !important; position:absolute; top:0; right:0; width:100%; direction:rtl; }
@@ -204,10 +210,11 @@ textarea { width:100%; padding:10px; border-radius:8px; border:1px solid var(--b
     </div>
 
     <div class="card">
+        <p class="sheet-hint">أدخل في الخلية واضغط <strong>Enter</strong> للنزول للبند التالي لنفس الموظف، أو <strong>Tab</strong> للانتقال بين الموظفين. الصافي بالنسبة للنظام يستثني عمولة الشرائح وآجل الشحن، والصافي النهائي يضيف عمولة الشرائح ويخصم آجل الشحن.</p>
         <div class="sheet-wrap">
             <table class="sheet" id="payrollSheet"></table>
         </div>
-        <p class="sheet-hint">أدخل في الخلية واضغط <strong>Enter</strong> للنزول للبند التالي لنفس الموظف، أو <strong>Tab</strong> للانتقال بين الموظفين. الصافي بالنسبة للنظام يستثني عمولة الشرائح وآجل الشحن، والصافي النهائي يضيف عمولة الشرائح ويخصم آجل الشحن.</p>
+        
     </div>
 </main>
 
@@ -264,6 +271,7 @@ textarea { width:100%; padding:10px; border-radius:8px; border:1px solid var(--b
         </form>
 
         <h3 style="font-size:13px; margin:16px 0 8px; color:var(--text-muted);">قائمة الموظفين</h3>
+        <p class="wa-note">اسحب المقبض <span class="material-icons" style="font-size:14px;vertical-align:middle;">drag_indicator</span> لترتيب الموظفين — نفس الترتيب يظهر في الجدول والكروت.</p>
         <div id="empList"></div>
     </div>
 </div>
@@ -347,11 +355,11 @@ textarea { width:100%; padding:10px; border-radius:8px; border:1px solid var(--b
 <div class="modal-overlay" id="waImportModal">
     <div class="modal-card">
         <div class="modal-head">
-            <h2>استيراد الحضور من واتساب</h2>
+            <h2>استيراد الحضور من واتساب <small style="font-weight:normal;color:var(--text-muted);font-size:10px;">(إصدار 5)</small></h2>
             <button class="modal-close" onclick="UI.closeModal('waImportModal')"><span class="material-icons">close</span></button>
         </div>
-        <p class="wa-note">من الجروب: ⋮ ← المزيد ← تصدير المحادثة ← <strong>بدون وسائط</strong>، واحفظ ملف الـ txt. ✅ = حضور، ❌ = انصراف.</p>
-        <div class="form-group"><label>ملف المحادثة (يمكن اختيار أكثر من ملف)</label><input type="file" id="waFile" accept=".txt,text/plain" multiple></div>
+        <p class="wa-note">من الجروب: ⋮ ← المزيد ← تصدير المحادثة، وارفع الملف كما هو (txt أو zip بدون فك الضغط). ✅ = حضور، ❌ = انصراف.</p>
+        <div class="form-group"><label>ملف المحادثة — txt أو zip مضغوط (يمكن اختيار أكثر من ملف)</label><input type="file" id="waFile" accept=".txt,.zip,text/plain,application/zip,application/x-zip-compressed" multiple></div>
         <div class="form-group mt-10"><label>أو الصق نص المحادثة هنا</label><textarea id="waPaste" rows="3" placeholder="اختياري"></textarea></div>
         <div class="form-group mt-10"><label>الشهر المطلوب استيراده</label><input type="month" id="waMonth"></div>
         <div class="form-row mt-10">
@@ -979,6 +987,44 @@ const Employees = {
         document.querySelectorAll('#empForm .prefs-group input[type=checkbox]').forEach(cb => cb.checked = true);
     },
 
+    startDrag(e) {
+        const handle = e.target.closest('.drag-handle'); if (!handle) return;
+        e.preventDefault();
+        const list = document.getElementById('empList'), item = handle.closest('.list-item');
+        const scroller = list.closest('.modal-card');
+        let lastY = e.clientY, active = true;
+        item.classList.add('dragging');
+        const onMove = ev => { lastY = ev.clientY; };
+        const tick = () => {
+            if (!active) return;
+            const r = scroller.getBoundingClientRect();
+            if (lastY < r.top + 45) scroller.scrollTop -= 10; else if (lastY > r.bottom - 45) scroller.scrollTop += 10;
+            let before = null;
+            for (const s of list.querySelectorAll('.list-item:not(.dragging)')) {
+                const b = s.getBoundingClientRect();
+                if (lastY < b.top + b.height / 2) { before = s; break; }
+            }
+            if (before) { if (item.nextElementSibling !== before) list.insertBefore(item, before); }
+            else if (list.lastElementChild !== item) list.appendChild(item);
+            requestAnimationFrame(tick);
+        };
+        const end = () => {
+            if (!active) return; active = false;
+            item.classList.remove('dragging');
+            window.removeEventListener('pointermove', onMove);
+            window.removeEventListener('pointerup', end);
+            window.removeEventListener('pointercancel', end);
+            const order = [...list.children].filter(c => c.dataset && c.dataset.id).map(c => c.dataset.id);
+            DB.employees.sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id));
+            DB.saveEmployees();
+            Payroll.render();
+        };
+        window.addEventListener('pointermove', onMove);
+        window.addEventListener('pointerup', end);
+        window.addEventListener('pointercancel', end);
+        requestAnimationFrame(tick);
+    },
+
     delete(id) {
         if (!confirm('تأكيد حذف الموظف؟ سيتم حذف بياناته المالية أيضاً.')) return;
         DB.employees = DB.employees.filter(e => e.id !== id);
@@ -992,8 +1038,9 @@ const Employees = {
         const el = document.getElementById('empList');
         if (DB.employees.length === 0) { el.innerHTML = '<p style="font-size:12px;color:var(--text-muted);">لا يوجد موظفين بعد</p>'; return; }
         el.innerHTML = DB.employees.map(e => `
-            <div class="list-item">
-                <div><strong>${e.name}</strong><div class="meta">${e.salary} — ${e.hours} س/يوم — ${e.vacations ?? 4} يوم إجازة${Employees.tracks(e) ? '' : ' — بدون حضور وانصراف'}</div></div>
+            <div class="list-item" data-id="${e.id}">
+                <span class="drag-handle" title="اسحب للترتيب"><span class="material-icons">drag_indicator</span></span>
+                <div class="emp-info"><strong>${e.name}</strong><div class="meta">${e.salary} — ${e.hours} س/يوم — ${e.vacations ?? 4} يوم إجازة${Employees.tracks(e) ? '' : ' — بدون حضور وانصراف'}</div></div>
                 <div class="list-item-actions">
                     <button class="icon-btn" onclick="Employees.loadEdit('${e.id}')"><span class="material-icons" style="font-size:19px;">edit</span></button>
                     <button class="icon-btn" style="color:var(--danger)" onclick="Employees.delete('${e.id}')"><span class="material-icons" style="font-size:19px;">delete</span></button>
@@ -1070,7 +1117,8 @@ const WAImport = {
         entries.forEach(e => { if (e.alen === 4) return; if (e.a > 12) mdyOk = false; if (e.b > 12) dmyOk = false; });
         if (mode === 'auto') mode = dmyOk ? 'dmy' : (mdyOk ? 'mdy' : 'dmy');
 
-        const IN = /[✅✔☑]/, OUT = /[❌✖❎]/;
+        const IN = /[✅✔☑✓🟢]/u, OUT = /[❌✖✘✗✕❎🚫⛔🛑🔴🟥]/u;
+        const others = [];
         const events = []; let minTs = Infinity, maxTs = -Infinity, ambiguous = 0;
         entries.forEach(e => {
             let y, mo, d;
@@ -1087,8 +1135,9 @@ const WAImport = {
             if (hasIn && hasOut) { ambiguous++; return; }
             if (hasIn) events.push({ sender:e.sender, type:'in', ts });
             else if (hasOut) events.push({ sender:e.sender, type:'out', ts });
+            else if (others.length < 3000) others.push({ sender:e.sender, text:e.text.trim().slice(0, 40), ts });
         });
-        return { events, minTs, maxTs, total: entries.length, mode, ambiguous };
+        return { events, others, minTs, maxTs, total: entries.length, mode, ambiguous };
     },
 
     fmtTod(ts) { const m = ((ts % 1440) + 1440) % 1440; return this.pad(Math.floor(m / 60)) + ':' + this.pad(m % 60); },
@@ -1134,10 +1183,46 @@ const WAImport = {
         return { days, warnings, sessions: sessions.length };
     },
 
+    async readZipText(file) {
+        const buf = await file.arrayBuffer(), dv = new DataView(buf), u8 = new Uint8Array(buf);
+        let eocd = -1;
+        for (let i = buf.byteLength - 22; i >= Math.max(0, buf.byteLength - 65557); i--) if (dv.getUint32(i, true) === 0x06054b50) { eocd = i; break; }
+        if (eocd < 0) throw new Error('bad zip');
+        const count = dv.getUint16(eocd + 10, true); let p = dv.getUint32(eocd + 16, true);
+        const texts = [];
+        for (let n = 0; n < count; n++) {
+            if (dv.getUint32(p, true) !== 0x02014b50) break;
+            const method = dv.getUint16(p + 10, true), csize = dv.getUint32(p + 20, true);
+            const nlen = dv.getUint16(p + 28, true), elen = dv.getUint16(p + 30, true), clen = dv.getUint16(p + 32, true), lho = dv.getUint32(p + 42, true);
+            const name = new TextDecoder().decode(u8.subarray(p + 46, p + 46 + nlen));
+            p += 46 + nlen + elen + clen;
+            if (!/\.txt$/i.test(name)) continue;               // skip media files
+            const start = lho + 30 + dv.getUint16(lho + 26, true) + dv.getUint16(lho + 28, true);
+            const data = u8.subarray(start, start + csize);
+            let out;
+            if (method === 0) out = data;
+            else if (method === 8) out = new Uint8Array(await new Response(new Blob([data]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer());
+            else continue;
+            texts.push(new TextDecoder('utf-8').decode(out));
+        }
+        return texts.join('\n');
+    },
+
+    async readFile(f) {
+        const head = new Uint8Array(await f.slice(0, 4).arrayBuffer());
+        const isZip = head[0] === 0x50 && head[1] === 0x4b;
+        if (!isZip) return await f.text();
+        try {
+            const t = await this.readZipText(f);
+            if (!t.trim()) UI.toast('لا يوجد ملف txt داخل الملف المضغوط');
+            return t;
+        } catch (err) { UI.toast('تعذر فتح الملف المضغوط'); return ''; }
+    },
+
     async analyze() {
         if (DB.employees.length === 0) return UI.toast('أضف موظفين أولاً');
         let text = document.getElementById('waPaste').value || '';
-        for (const f of document.getElementById('waFile').files) text += '\n' + await f.text();
+        for (const f of document.getElementById('waFile').files) text += '\n' + await this.readFile(f);
         if (!text.trim()) return UI.toast('اختر ملف أو الصق النص');
 
         const monthVal = document.getElementById('waMonth').value;
@@ -1163,7 +1248,12 @@ const WAImport = {
         this.st.senders = Object.values(stats).sort((a, b) => (b.ins + b.outs) - (a.ins + a.outs));
 
         const opts = sel => '<option value="">— تجاهل —</option>' + DB.employees.filter(e => Employees.tracks(e)).map(e => `<option value="${e.id}"${e.id === sel ? ' selected' : ''}>${this.esc(e.name)}</option>`).join('');
-        const rows = this.st.senders.map((s, i) => `<tr><td>${this.esc(s.name)}</td><td>✅ ${s.ins} &nbsp; ❌ ${s.outs}</td><td><select data-i="${i}" class="wa-map">${opts(this.suggest(s.name))}</select></td></tr>`).join('');
+        const used = new Set(), savedMap0 = LS.get('pr_wa_map', {});
+        const sugg = this.st.senders.map(s => { let id = this.suggest(s.name); if (id && savedMap0[s.name] !== id && used.has(id)) id = ''; if (id) used.add(id); return id; });
+        const rows = this.st.senders.map((s, i) => `<tr><td>${this.esc(s.name)}</td><td>✅ ${s.ins} &nbsp; ❌ ${s.outs}</td><td><select data-i="${i}" class="wa-map">${opts(sugg[i])}</select></td></tr>`).join('');
+        const nameSet = new Set(this.st.senders.map(s => s.name));
+        const oth = p.others.filter(o => nameSet.has(o.sender));
+        const othHtml = oth.length ? `<div class="prefs-title">رسائل من نفس الأسماء لم تُحسب حضوراً ولا انصرافاً (${oth.length})</div><div class="wa-warn" style="background:var(--bg-color)">${oth.slice(0, 6).map(o => `${this.esc(o.sender)}: «${this.esc(o.text)}»`).join('<br>')}${oth.length > 6 ? '<br>…' : ''}</div><p class="wa-note">لو ظهر هنا انصراف مكتوب برمز أو كلمة غير ✅/❌ ابعتلي شكلها لأضيفه.</p>` : '';
         const range = `${this.fmtFull(p.minTs).slice(0, 5)} ← ${this.fmtFull(p.maxTs).slice(0, 5)}`;
         const el = document.getElementById('waStep2');
         el.classList.remove('hidden');
@@ -1175,6 +1265,7 @@ const WAImport = {
                 <div class="wa-stat">ترتيب التاريخ: <strong>${p.mode === 'dmy' ? 'يوم/شهر' : 'شهر/يوم'}</strong></div>
                 ${p.ambiguous ? `<div class="wa-stat">رسائل فيها ✅ و❌ معاً (تم تجاهلها): <strong>${p.ambiguous}</strong></div>` : ''}
             </div>
+            ${othHtml}
             <div class="prefs-title">مطابقة أسماء الجروب مع الموظفين</div>
             <table class="wa-table"><thead><tr><th>الاسم في الجروب</th><th>الرسائل</th><th>الموظف</th></tr></thead><tbody>${rows}</tbody></table>
             <div class="prefs-group" style="margin-top:8px;">
@@ -1227,16 +1318,22 @@ const WAImport = {
                 const d = dayOf(dn); if (!rec.days[d]) continue;
                 let day = r.days[dn];
                 if (dn === openDn) {
-                    // today: complete unfinished shift with the default end time instead of counting delay/absence
+                    // today: only an employee who checked in but has NOT checked out yet gets the default end time; a recorded ❌ is kept as-is
                     if (!day) day = Object.assign({}, def);
-                    else if (!day.out || Attendance.computeDayTotal(day) < (emp.hours || 8) - 0.01) day.out = def.out;
+                    else if (!day.out) day.out = def.out;
                 }
                 if (day) { rec.days[d] = day; count++; }
                 else if (clearEmpty) rec.days[d] = { in:'', bOut:'', bIn:'', out:'' };
             }
             totalDays += count;
-            lines.push(`${this.esc(emp.name)}: ${count} يوم حضور`);
+            const evc = byEmp[empId], lastDn = Math.max(...Object.keys(r.days).map(Number).filter(k => k >= rs && k <= re), -1);
+            const ld = lastDn >= 0 ? rec.days[dayOf(lastDn)] : null;
+            lines.push(`${this.esc(emp.name)}: ${count} يوم — قرأت ✅${evc.filter(x => x.type === 'in').length} ❌${evc.filter(x => x.type === 'out').length}` + (ld ? ` — آخر يوم (${dayOf(lastDn)}): ${ld.in || '؟'} ← ${ld.out || '؟'}` : ''));
         });
+
+        const perEmp = {}; Object.keys(map).forEach(sn => { (perEmp[map[sn]] = perEmp[map[sn]] || []).push(sn); });
+        const dupNames = Object.keys(perEmp).filter(id => perEmp[id].length > 1).map(id => `${(DB.employees.find(e => e.id === id) || {}).name}: ${perEmp[id].join(' + ')}`);
+        const unmapped = DB.employees.filter(e => Employees.tracks(e) && !byEmp[e.id]).map(e => e.name);
 
         // days after the last imported day -> default attendance (counted as present) for every tracked employee
         if (re < monthEndDn) {
@@ -1252,8 +1349,10 @@ const WAImport = {
         const rep = document.getElementById('waReport');
         rep.innerHTML = `<div class="wa-ok mt-10"><strong>تم الاستيراد ✔</strong> — ${Payroll.monthLabel(monthKey)}: ${totalDays} يوم حضور لـ ${lines.length} موظف<br>${lines.join('<br>')}` +
             (re < monthEndDn ? `<br><span style="color:var(--text-muted)">الأيام من ${dayOf(re) + 1} إلى ${dayOf(monthEndDn)} محسوبة حضوراً بالأوقات الافتراضية</span>` : '') +
-            (openDn !== null ? `<br><span style="color:var(--text-muted)">اليوم ${dayOf(openDn)} لم ينتهِ: أُكملت الورديات غير المنتهية بوقت الانصراف الافتراضي</span>` : '') +
+            (openDn !== null ? `<br><span style="color:var(--text-muted)">اليوم ${dayOf(openDn)} لم ينتهِ: من سجّل حضور ولم يسجّل انصراف بعد أُكمل بوقت الانصراف الافتراضي، ومن سجّل ❌ بقي وقته كما هو</span>` : '') +
             (skipped ? `<br><span style="color:var(--text-muted)">تم تجاهل ${skipped} رسالة من أسماء غير مربوطة</span>` : '') + `</div>` +
+            (dupNames.length ? `<div class="wa-warn mt-10">⚠ أكثر من اسم مربوط بنفس الموظف (يُدمجون معاً): ${this.esc(dupNames.join(' | '))}</div>` : '') +
+            (unmapped.length ? `<div class="wa-warn mt-10">موظفون عليهم حضور لكن لم يُربط لهم اسم (لم تتغير أيامهم): ${this.esc(unmapped.join('، '))}</div>` : '') +
             (allWarn.length ? `<div class="prefs-title">تنبيهات تحتاج مراجعة (${allWarn.length})</div><div class="wa-warn">${allWarn.join('<br>')}</div>` : '');
         UI.toast('تم الاستيراد');
     }
@@ -1318,6 +1417,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if (DB.settings.theme === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
     document.getElementById('payrollMonth').value = new Date().toISOString().slice(0, 7);
     document.querySelectorAll('.modal-overlay').forEach(m => m.addEventListener('click', e => { if (e.target === m) m.classList.remove('active'); }));
+    document.getElementById('empList').addEventListener('pointerdown', Employees.startDrag);
+    const setHdr = () => document.documentElement.style.setProperty('--hdr', document.querySelector('.app-header').offsetHeight + 'px');
+    setHdr(); window.addEventListener('resize', setHdr); if (document.fonts) document.fonts.ready.then(setHdr);
     Payroll.render();
 });
 </script>
