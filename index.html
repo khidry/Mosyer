@@ -185,6 +185,12 @@ textarea { width:100%; padding:10px; border-radius:8px; border:1px solid var(--b
 .wa-stat { background:var(--bg-color); border-radius:8px; padding:6px 10px; font-size:12px; }
 .wa-warn { max-height:180px; overflow-y:auto; background:var(--red-light); border-radius:8px; padding:8px 10px; font-size:11.5px; line-height:1.8; }
 .wa-ok { background:var(--green-light); border-radius:8px; padding:8px 10px; font-size:12.5px; line-height:1.8; margin-bottom:8px; }
+.att-extra td { background:var(--bg-color); }
+.att-day, .att-date, .att-total-cell { vertical-align:middle; }
+.att-add, .att-del { border:1px solid var(--border); background:transparent; color:var(--text-muted); border-radius:4px; font-size:11px; line-height:1; padding:1px 5px; margin-inline-start:4px; cursor:pointer; }
+.att-out { position:relative; }
+.att-del { position:absolute; inset-inline-end:2px; top:50%; transform:translateY(-50%); }
+@media print { .att-add, .att-del { display:none !important; } }
 </style>
 </head>
 <body>
@@ -192,12 +198,17 @@ textarea { width:100%; padding:10px; border-radius:8px; border:1px solid var(--b
 <header class="app-header">
     <div class="header-title"><span class="material-icons">payments</span><h1>مسير الرواتب</h1></div>
     <div class="header-actions">
+        <button class="icon-btn" id="syncBtn" onclick="UI.openModal('settingsModal')" title="النسخ الاحتياطي"><span class="material-icons" id="syncIcon">cloud_off</span></button>
         <button class="icon-btn" onclick="UI.openModal('employeesModal')" title="الموظفين"><span class="material-icons">group</span></button>
         <button class="icon-btn" onclick="UI.openModal('settingsModal')" title="الإعدادات"><span class="material-icons">settings</span></button>
     </div>
 </header>
 
 <main class="app-main">
+    <div id="syncBanner" class="wa-warn hidden" style="margin-bottom:10px; display:flex; align-items:center; gap:8px; justify-content:space-between;">
+        <span id="syncBannerText">النسخة الاحتياطية المرتبطة تحتاج إذنك لمتابعة الحفظ والمزامنة.</span>
+        <button class="btn btn-primary btn-sm" onclick="Sync.reauth()">تفعيل</button>
+    </div>
     <div class="card">
         <div class="toolbar">
             <input type="month" id="payrollMonth" onchange="Payroll.render()">
@@ -303,6 +314,18 @@ textarea { width:100%; padding:10px; border-radius:8px; border:1px solid var(--b
         <div class="prefs-group">
             <label><input type="checkbox" id="cleanPrintToggle" onchange="Settings.toggleCleanPrint(this.checked)"> طباعة نظيفة (إخفاء البنود الصفرية من الكروت)</label>
         </div>
+
+        <div class="prefs-title">النسخ الاحتياطي التلقائي والمزامنة</div>
+        <p class="wa-note" id="syncStatus"></p>
+        <div id="syncBtns" style="display:flex; gap:8px; flex-wrap:wrap;">
+            <button class="btn btn-primary btn-sm" onclick="Sync.linkExisting()"><span class="material-icons" style="font-size:16px;">link</span> ربط ملف موجود</button>
+            <button class="btn btn-outline btn-sm" onclick="Sync.linkNew()"><span class="material-icons" style="font-size:16px;">note_add</span> إنشاء ملف جديد</button>
+            <button class="btn btn-outline btn-sm" id="syncNowBtn" onclick="Sync.syncNow()"><span class="material-icons" style="font-size:16px;">sync</span> مزامنة الآن</button>
+            <button class="btn btn-outline btn-sm" id="syncUnlinkBtn" onclick="Sync.unlink()"><span class="material-icons" style="font-size:16px;">link_off</span> فك الربط</button>
+        </div>
+        <p class="wa-note">ضع الملف داخل مجلد Google Drive (المتزامن على الجهازين) واربطه مرة واحدة من كل جهاز. الحفظ يتم تلقائياً بعد كل تعديل، وعند فتح الملف على جهاز آخر يتم استيراد آخر نسخة تلقائياً.</p>
+        <div class="prefs-title">نسخ محلية تلقائية (على هذا الجهاز)</div>
+        <div id="snapList" class="wa-note"></div>
 
         <div class="prefs-title">البيانات</div>
         <div style="display:flex; gap:8px; flex-wrap:wrap;">
@@ -419,7 +442,7 @@ const DB = {
             for (let d = 1; d <= daysInMonth; d++) days[d] = this.defaultDayAttendance(emp);
             rec = { empId, month, days };
             this.attendance.push(rec);
-            this.saveAttendance();
+            LS.set('pr_attendance', this.attendance);
         }
         return rec;
     }
@@ -755,21 +778,27 @@ const Attendance = {
         return names[new Date(y, m - 1, d).getDay()];
     },
 
+    dur(a, b) {
+        const x = Attendance.timeToDec(a), y = Attendance.timeToDec(b);
+        if (x === null || y === null) return 0;
+        let d = y - x; if (d < 0) d += 24;
+        return d;
+    },
+
+    // one row = up to two sessions: (in -> bOut) and (bIn -> out)
+    rowTotal(r) {
+        if (Attendance.timeToDec(r.in) === null) return 0;
+        if (Attendance.timeToDec(r.bOut) !== null && Attendance.timeToDec(r.bIn) !== null)
+            return Attendance.dur(r.in, r.bOut) + Attendance.dur(r.bIn, r.out);
+        return Attendance.dur(r.in, r.out);
+    },
+
     computeDayTotal(day) {
-        const inDec = Attendance.timeToDec(day.in);
-        const outDec = Attendance.timeToDec(day.out);
-        if (inDec === null || outDec === null) return 0;
-        let total = outDec - inDec;
-        if (total < 0) total += 24;
-        const brk = (o, i) => {
-            const a = Attendance.timeToDec(o), b = Attendance.timeToDec(i);
-            if (a === null || b === null) return 0;
-            let d = b - a; if (d < 0) d += 24;
-            return d;
-        };
-        total -= brk(day.bOut, day.bIn);
-        (day.xb || []).forEach(p => { total -= brk(p[0], p[1]); });
-        return Math.max(0, total);
+        let total = Attendance.rowTotal(day);
+        (day.xb || []).forEach(p => { total -= Attendance.dur(p[0], p[1]); });   // legacy extra breaks
+        total = Math.max(0, total);
+        (day.x || []).forEach(r => { total += Attendance.rowTotal(r); });
+        return total;
     },
 
     computeMonthSummary(emp, month) {
@@ -811,15 +840,17 @@ const Attendance = {
         dayNums.forEach(d => {
             const day = rec.days[d];
             const total = Attendance.computeDayTotal(day);
-            html += `<tr>
-                <td class="att-day">${Attendance.dayName(y, m, d)}</td>
-                <td class="att-date">${d}</td>
-                <td class="att-in"><input type="text" class="att-input" value="${day.in}" placeholder="--:--" data-emp="${emp.id}" data-month="${month}" data-day="${d}" data-field="in" onchange="Attendance.update(this)"></td>
-                <td class="att-brk"><input type="text" class="att-input" value="${day.bOut}" placeholder="--:--" data-emp="${emp.id}" data-month="${month}" data-day="${d}" data-field="bOut" onchange="Attendance.update(this)"></td>
-                <td class="att-brk"><input type="text" class="att-input" value="${day.bIn}" placeholder="--:--" data-emp="${emp.id}" data-month="${month}" data-day="${d}" data-field="bIn" onchange="Attendance.update(this)"></td>
-                <td class="att-out"><input type="text" class="att-input" value="${day.out}" placeholder="--:--" data-emp="${emp.id}" data-month="${month}" data-day="${d}" data-field="out" onchange="Attendance.update(this)"></td>
-                <td class="att-tot att-total-cell"${(day.xb && day.xb.length) ? ` title="+${day.xb.length} استراحة إضافية من واتساب: ${day.xb.map(p => p.join('→')).join(' ، ')}"` : ''}>${Payroll.formatHM(total)}${(day.xb && day.xb.length) ? '*' : ''}</td>
-            </tr>`;
+            const rows = [day].concat(day.x || []);
+            const legacy = (day.xb && day.xb.length) ? ` title="+${day.xb.length} استراحة إضافية: ${day.xb.map(p => p.join('→')).join(' ، ')}"` : '';
+            rows.forEach((r, k) => {
+                const inp = f => `<input type="text" class="att-input" value="${r[f] || ''}" placeholder="--:--" data-emp="${emp.id}" data-month="${month}" data-day="${d}" data-row="${k}" data-field="${f}" onchange="Attendance.update(this)">`;
+                html += `<tr class="${k ? 'att-extra' : ''}">` +
+                    (k === 0 ? `<td class="att-day" rowspan="${rows.length}">${Attendance.dayName(y, m, d)}</td><td class="att-date" rowspan="${rows.length}">${d}<button type="button" class="att-add" title="إضافة صف حضور/انصراف لهذا اليوم" onclick="Attendance.addRow('${emp.id}','${month}',${d},this)">+</button></td>` : '') +
+                    `<td class="att-in">${inp('in')}</td><td class="att-brk">${inp('bOut')}</td><td class="att-brk">${inp('bIn')}</td>` +
+                    `<td class="att-out">${inp('out')}${k ? `<button type="button" class="att-del" title="حذف هذا الصف" onclick="Attendance.removeRow('${emp.id}','${month}',${d},${k},this)">×</button>` : ''}</td>` +
+                    (k === 0 ? `<td class="att-tot att-total-cell" data-day="${d}" rowspan="${rows.length}"${legacy}>${Payroll.formatHM(total)}${legacy ? '*' : ''}</td>` : '') +
+                    `</tr>`;
+            });
         });
 
         const s = Attendance.computeMonthSummary(emp, month);
@@ -833,20 +864,24 @@ const Attendance = {
 
     update(input) {
         const empId = input.dataset.emp, month = input.dataset.month, day = input.dataset.day, field = input.dataset.field;
+        const k = parseInt(input.dataset.row || '0', 10);
         const rec = DB.getAttendance(empId, month);
+        const target = k === 0 ? rec.days[day] : (rec.days[day].x || [])[k - 1];
+        if (!target) return;
         let val = input.value.trim();
         if (val) {
             const dec = Attendance.timeToDec(val);
-            if (dec === null) { input.value = rec.days[day][field]; return; }
+            if (dec === null) { input.value = target[field]; return; }
             val = Attendance.decToTime(dec);
         }
-        rec.days[day][field] = val;
+        target[field] = val;
         DB.saveAttendance();
         input.value = val;
 
         const total = Attendance.computeDayTotal(rec.days[day]);
-        const row = input.closest('tr');
-        row.querySelector('.att-total-cell').textContent = Payroll.formatHM(total);
+        const tblEl = input.closest('table');
+        const totCell = tblEl && tblEl.querySelector(`.att-total-cell[data-day="${day}"]`);
+        if (totCell) totCell.textContent = Payroll.formatHM(total);
 
         const emp = DB.employees.find(e => e.id === empId);
         const s = Attendance.computeMonthSummary(emp, month);
@@ -870,6 +905,39 @@ const Attendance = {
         if (bulkSlip) bulkSlip.innerHTML = Payroll.generateSlipHTML(emp, month);
 
         Attendance.refreshSheetInputs(empId);
+    },
+
+    addRow(empId, month, d, btn) {
+        const rec = DB.getAttendance(empId, month);
+        const day = rec.days[d]; day.x = day.x || [];
+        day.x.push({ in:'', bOut:'', bIn:'', out:'' });
+        DB.saveAttendance();
+        Attendance.rerender(empId, month, btn);
+    },
+
+    removeRow(empId, month, d, k, btn) {
+        const rec = DB.getAttendance(empId, month);
+        const day = rec.days[d];
+        if (!day.x || !day.x[k - 1]) return;
+        day.x.splice(k - 1, 1);
+        if (!day.x.length) delete day.x;
+        DB.saveAttendance();
+        Attendance.rerender(empId, month, btn);
+        const emp = DB.employees.find(e => e.id === empId);
+        Attendance.syncToPayroll(emp, month);
+        Payroll.recalcEmployee(empId, month);
+        const singleSlip = document.getElementById('empSlipContent');
+        if (singleSlip && Payroll._currentSlipEmp === empId) singleSlip.innerHTML = Payroll.generateSlipHTML(emp, month);
+        const bulkSlip = document.getElementById('bulk-slip-' + empId);
+        if (bulkSlip) bulkSlip.innerHTML = Payroll.generateSlipHTML(emp, month);
+        Attendance.refreshSheetInputs(empId);
+    },
+
+    rerender(empId, month, el) {
+        const wrap = el.closest('.att-wrap'); if (!wrap) return;
+        const emp = DB.employees.find(e => e.id === empId);
+        const top = wrap.scrollTop;
+        wrap.outerHTML = Attendance.render(emp, month);
     },
 
     refreshSheetInputs(empId) {
@@ -1167,17 +1235,15 @@ const WAImport = {
         sessions.forEach(s => { const k = this.dayNum(s.start, cutoffMin); (byDay[k] = byDay[k] || []).push(s); });
         const days = {};
         Object.keys(byDay).forEach(k => {
-            const ss = byDay[k].sort((a, b) => a.start - b.start);
-            const closed = ss.filter(s => s.end !== null);
-            const gaps = [];
-            for (let i = 0; i < ss.length - 1; i++) if (ss[i].end !== null && ss[i + 1].end !== null) gaps.push({ from:ss[i].end, to:ss[i + 1].start });
-            let big = -1;
-            gaps.forEach((g, i) => { if (big < 0 || (g.to - g.from) > (gaps[big].to - gaps[big].from)) big = i; });
-            const day = { in:this.fmtTod(ss[0].start), bOut:'', bIn:'', out: closed.length ? this.fmtTod(closed[closed.length - 1].end) : '', xb:[] };
-            gaps.forEach((g, i) => {
-                if (i === big) { day.bOut = this.fmtTod(g.from); day.bIn = this.fmtTod(g.to); }
-                else day.xb.push([this.fmtTod(g.from), this.fmtTod(g.to)]);
-            });
+            let ss = byDay[k].sort((a, b) => a.start - b.start);
+            ss = ss.filter((x, i) => x.end !== null || i === ss.length - 1);   // an unclosed session followed by another one is dropped (already warned)
+            const rows = [];
+            for (let i = 0; i < ss.length; i += 2) {
+                const A = ss[i], B = ss[i + 1];
+                if (B) rows.push({ in:this.fmtTod(A.start), bOut:this.fmtTod(A.end), bIn:this.fmtTod(B.start), out:B.end !== null ? this.fmtTod(B.end) : '' });
+                else rows.push({ in:this.fmtTod(A.start), bOut:'', bIn:'', out:A.end !== null ? this.fmtTod(A.end) : '' });
+            }
+            const day = rows[0]; day.x = rows.slice(1);
             days[k] = day;
         });
         return { days, warnings, sessions: sessions.length };
@@ -1320,7 +1386,7 @@ const WAImport = {
                 if (dn === openDn) {
                     // today: only an employee who checked in but has NOT checked out yet gets the default end time; a recorded ❌ is kept as-is
                     if (!day) day = Object.assign({}, def);
-                    else if (!day.out) day.out = def.out;
+                    else { const lr = (day.x && day.x.length) ? day.x[day.x.length - 1] : day; if (lr.in && !lr.out) lr.out = def.out; }
                 }
                 if (day) { rec.days[d] = day; count++; }
                 else if (clearEmpty) rec.days[d] = { in:'', bOut:'', bIn:'', out:'' };
@@ -1369,6 +1435,7 @@ const Settings = {
         document.getElementById('crSim').value = cr.simRate;
         document.getElementById('darkModeToggle').checked = DB.settings.theme === 'dark';
         document.getElementById('cleanPrintToggle').checked = !!DB.settings.cleanPrint;
+        Sync.renderStatus();
     },
     saveRate(key, val) { DB.settings.commRates[key] = parseFloat(val) || 0; DB.saveSettings(); Payroll.render(); UI.toast('تم الحفظ'); },
     toggleTheme(isDark) {
@@ -1393,14 +1460,10 @@ const Settings = {
         reader.onload = ev => {
             try {
                 const data = JSON.parse(ev.target.result);
-                if (data.employees) { DB.employees = data.employees; DB.saveEmployees(); }
-                if (data.records) { DB.records = data.records; DB.saveRecords(); }
-                if (data.attendance) { DB.attendance = data.attendance; DB.saveAttendance(); }
-                if (data.waMap) LS.set('pr_wa_map', data.waMap);
-                if (data.settings) { DB.settings = data.settings; DB.saveSettings(); }
+                const d = data.data && data.savedAt ? data.data : data;
+                Sync.snapNow('قبل الاسترجاع اليدوي');
+                Sync.applyData(d, false);
                 UI.toast('تم الاسترجاع بنجاح');
-                Employees.render(); Settings.render(); Payroll.render();
-                if (DB.settings.theme) document.documentElement.setAttribute('data-theme', DB.settings.theme);
             } catch { alert('ملف غير صالح'); }
         };
         reader.readAsText(file);
@@ -1412,6 +1475,249 @@ const Settings = {
     }
 };
 
+/* ---------------- Auto backup + Google Drive folder sync ---------------- */
+const Sync = {
+    META: 'pr_sync_meta',
+    handle: null, applying: false, busy: false, lastSer: '', pushTimer: null, touchTimer: null, lastSnapTs: 0, state: 'none', remoteInfo: null,
+    supported: !!(window.showOpenFilePicker && window.showSaveFilePicker),
+    FTYPES: [{ description:'نسخة احتياطية', accept:{ 'application/json':['.json'] } }],
+
+    /* ---- storage helpers ---- */
+    meta() { return LS.get(this.META, {}); },
+    saveMeta(m) { LS.set(this.META, m); },
+    device() { const m = this.meta(); if (!m.device) { m.device = Math.random().toString(36).slice(2, 8); this.saveMeta(m); } return m.device; },
+    label() { return ((navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || 'جهاز') + '·' + this.device(); },
+    fmt(ms) { if (!ms) return '—'; const d = new Date(ms), p = n => String(n).padStart(2, '0'); return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`; },
+    payload() { return { employees:DB.employees, records:DB.records, attendance:DB.attendance, settings:DB.settings, waMap:LS.get('pr_wa_map', {}) }; },
+    // used only to detect REAL changes: default-generated attendance months and all-zero records are ignored
+    serialize() {
+        const p = this.payload();
+        const zero = r => Object.keys(r).every(k => k === 'empId' || k === 'month' || !r[k]);
+        const isDefault = a => {
+            const emp = DB.employees.find(e => e.id === a.empId); if (!emp) return false;
+            const d = DB.defaultDayAttendance(emp);
+            return Object.values(a.days).every(x => x.in === d.in && x.out === d.out && !x.bOut && !x.bIn && !(x.x && x.x.length) && !(x.xb && x.xb.length));
+        };
+        return JSON.stringify(Object.assign({}, p, { records:p.records.filter(r => !zero(r)), attendance:p.attendance.filter(a => !isDefault(a)) }));
+    },
+
+    /* ---- IndexedDB (file handle + local snapshots) ---- */
+    idb() {
+        return new Promise((res, rej) => {
+            const r = indexedDB.open('payroll_sync', 1);
+            r.onupgradeneeded = () => { r.result.createObjectStore('kv'); r.result.createObjectStore('snaps', { keyPath:'ts' }); };
+            r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+        });
+    },
+    async tx(store, mode, fn) {
+        const db = await this.idb();
+        return new Promise((res, rej) => { const t = db.transaction(store, mode), st = t.objectStore(store); const rq = fn(st); t.oncomplete = () => res(rq && rq.result); t.onerror = () => rej(t.error); t.onabort = () => rej(t.error); });
+    },
+    kvGet(k) { return this.tx('kv', 'readonly', st => st.get(k)); },
+    kvSet(k, v) { return this.tx('kv', 'readwrite', st => st.put(v, k)); },
+    kvDel(k) { return this.tx('kv', 'readwrite', st => st.delete(k)); },
+    async snapNow(label) {
+        try {
+            const ts = Date.now(); this.lastSnapTs = ts;
+            await this.tx('snaps', 'readwrite', st => st.put({ ts, label, savedAt:this.meta().savedAt || ts, data:JSON.parse(JSON.stringify(this.payload())) }));
+            const all = await this.tx('snaps', 'readonly', st => st.getAllKeys());
+            const extra = (all || []).sort((a, b) => b - a).slice(15);
+            if (extra.length) await this.tx('snaps', 'readwrite', st => { extra.forEach(k => st.delete(k)); });
+        } catch {}
+    },
+    async snaps() { try { return ((await this.tx('snaps', 'readonly', st => st.getAll())) || []).sort((a, b) => b.ts - a.ts); } catch { return []; } },
+    async restoreSnap(ts) {
+        const all = await this.snaps(); const sn = all.find(x => x.ts === ts); if (!sn) return;
+        if (!confirm(`استرجاع النسخة المحلية بتاريخ ${this.fmt(sn.ts)}؟ سيتم حفظ الوضع الحالي كنسخة قبل الاسترجاع.`)) return;
+        await this.snapNow('قبل الاسترجاع');
+        this.applyData(sn.data, false);
+        UI.toast('تم الاسترجاع');
+    },
+
+    /* ---- change tracking ---- */
+    touch() {
+        if (this.applying) return;
+        clearTimeout(this.touchTimer);
+        this.touchTimer = setTimeout(() => this.commitTouch(), 400);
+    },
+    commitTouch() {
+        const ser = this.serialize();
+        if (ser === this.lastSer) return;                 // nothing really changed (e.g. opening a slip)
+        this.lastSer = ser;
+        const m = this.meta(); m.savedAt = Date.now(); this.saveMeta(m);
+        if (Date.now() - this.lastSnapTs > 10 * 60 * 1000) this.snapNow('تلقائي');
+        if (this.handle) { clearTimeout(this.pushTimer); this.pushTimer = setTimeout(() => { this.pushTimer = null; this.check(); }, 1500); }
+        this.renderStatus();
+    },
+
+    /* ---- apply data (restore / import from file) ---- */
+    applyData(d, silent) {
+        this.applying = !!silent;
+        try {
+            if (d.employees) { DB.employees = d.employees; DB.saveEmployees(); }
+            if (d.records) { DB.records = d.records; DB.saveRecords(); }
+            if (d.attendance) { DB.attendance = d.attendance; DB.saveAttendance(); }
+            if (d.waMap) LS.set('pr_wa_map', d.waMap);
+            if (d.settings) { DB.settings = d.settings; if (!DB.settings.commRates) DB.settings.commRates = { tabby:20, tamara:20, mora:100, simRate:5 }; DB.saveSettings(); }
+        } finally { this.applying = false; }
+        if (silent) this.lastSer = this.serialize();
+        if (DB.settings.theme) document.documentElement.setAttribute('data-theme', DB.settings.theme);
+        ['empSlipModal', 'allSlipsModal'].forEach(id => UI.closeModal(id));
+        Payroll.render();
+        if (document.getElementById('employeesModal').classList.contains('active')) Employees.render();
+        Settings.render();
+    },
+
+    /* ---- file access ---- */
+    async perm(request) {
+        if (!this.handle) return false;
+        const o = { mode:'readwrite' };
+        try {
+            let p = await this.handle.queryPermission(o);
+            if (p === 'granted') return true;
+            if (request) { p = await this.handle.requestPermission(o); return p === 'granted'; }
+        } catch {}
+        return false;
+    },
+    async readRemote() {
+        const f = await this.handle.getFile(); const t = await f.text();
+        if (!t.trim()) return null;
+        try {
+            const j = JSON.parse(t);
+            if (j && j.data && j.savedAt) return j;
+            if (j && j.employees) return { savedAt:f.lastModified, device:'نسخة يدوية', data:j };   // plain manual backup
+        } catch {}
+        return 'invalid';
+    },
+    async write() {
+        this.device();
+        const m = this.meta();
+        if (!m.savedAt) m.savedAt = Date.now();
+        const snap = { app:'payroll-sheet', v:1, savedAt:m.savedAt, device:this.label(), data:this.payload() };
+        const w = await this.handle.createWritable();
+        await w.write(JSON.stringify(snap)); await w.close();
+        m.syncedAt = snap.savedAt; this.saveMeta(m);
+        this.remoteInfo = { savedAt:snap.savedAt, device:snap.device };
+        this.setState('ok');
+    },
+    userIsTyping() { const a = document.activeElement; return !!(a && a.tagName === 'INPUT' && a.closest('.sheet-wrap, .att-wrap, .modal-card') && !a.readOnly && a.type !== 'checkbox'); },
+
+    /* decide: pull newer remote, or push newer local */
+    async check() {
+        if (!this.handle || this.busy) return;
+        if (this.pushTimer) return;                        // a push is already scheduled
+        this.busy = true;
+        try {
+            if (!(await this.perm(false))) { this.setState('needperm'); return; }
+            const remote = await this.readRemote();
+            const m = this.meta(), synced = m.syncedAt || 0, local = m.savedAt || 0;
+            if (remote === 'invalid') { this.setState('invalid'); return; }
+            if (!remote) { await this.write(); return; }
+            this.remoteInfo = { savedAt:remote.savedAt, device:remote.device };
+            const localDirty = local > synced;
+            if (remote.savedAt > synced && !(localDirty && local >= remote.savedAt)) {
+                if (this.userIsTyping()) return;           // do not disturb typing; retry on next check
+                await this.snapNow(localDirty ? 'قبل الاستيراد (تعديلات غير مزامَنة)' : 'قبل الاستيراد');
+                this.applyData(remote.data, true);
+                const m2 = this.meta(); m2.savedAt = remote.savedAt; m2.syncedAt = remote.savedAt; this.saveMeta(m2);
+                this.setState('ok');
+                UI.toast(`تم استيراد نسخة أحدث (${this.fmt(remote.savedAt)}) من ${remote.device || 'جهاز آخر'}` + (localDirty ? ' — تم استبدال تعديلات محلية غير مزامَنة (محفوظة كنسخة محلية)' : ''));
+            } else if (localDirty || remote.savedAt < local) {
+                await this.write();
+            } else this.setState('ok');
+        } catch (e) { this.setState('error'); }
+        finally { this.busy = false; }
+    },
+    async syncNow() { if (!this.handle) return UI.toast('اربط ملفاً أولاً'); if (!(await this.perm(true))) return this.setState('needperm'); await this.check(); UI.toast('تمت المزامنة'); },
+    async reauth() { if (await this.perm(true)) { await this.check(); } },
+
+    /* ---- linking ---- */
+    async linkExisting() {
+        if (!this.supported) return UI.toast('المتصفح لا يدعم الربط بملف');
+        try { const [h] = await window.showOpenFilePicker({ types:this.FTYPES, multiple:false }); await this.adopt(h); }
+        catch (e) { if (e && e.name !== 'AbortError') UI.toast('تعذر ربط الملف'); }
+    },
+    async linkNew() {
+        if (!this.supported) return UI.toast('المتصفح لا يدعم الربط بملف');
+        try { const h = await window.showSaveFilePicker({ suggestedName:'payroll-backup.json', types:this.FTYPES }); await this.adopt(h); }
+        catch (e) { if (e && e.name !== 'AbortError') UI.toast('تعذر إنشاء الملف'); }
+    },
+    async adopt(h) {
+        this.handle = h;
+        if (!(await this.perm(true))) { this.handle = null; return UI.toast('لم يتم منح الإذن'); }
+        try {
+            const remote = await this.readRemote();
+            const m = this.meta();
+            if (remote === 'invalid') {
+                if (!confirm('هذا الملف ليس نسخة احتياطية معروفة. هل تريد استبدال محتواه بنسخة من هذا الجهاز؟')) { this.handle = null; return; }
+                await this.write();
+            } else if (remote) {
+                const hasLocal = DB.employees.length > 0;
+                const useRemote = !hasLocal || confirm(`الملف يحتوي نسخة محفوظة بتاريخ ${this.fmt(remote.savedAt)} (${remote.device || ''}).\nآخر تعديل على هذا الجهاز: ${this.fmt(m.savedAt)}.\n\nموافق = استيراد نسخة الملف (يستبدل بيانات هذا الجهاز، وتُحفظ نسخة محلية قبل ذلك)\nإلغاء = استبدال الملف ببيانات هذا الجهاز`);
+                if (useRemote) {
+                    await this.snapNow('قبل الاستيراد من الملف');
+                    this.applyData(remote.data, true);
+                    const m2 = this.meta(); m2.savedAt = remote.savedAt; m2.syncedAt = remote.savedAt; this.saveMeta(m2);
+                    this.remoteInfo = { savedAt:remote.savedAt, device:remote.device };
+                    UI.toast('تم استيراد النسخة من الملف');
+                } else { const m2 = this.meta(); m2.savedAt = Date.now(); this.saveMeta(m2); await this.write(); }
+            } else { const m2 = this.meta(); if (!m2.savedAt) { m2.savedAt = Date.now(); this.saveMeta(m2); } await this.write(); }
+            try { await this.kvSet('handle', h); } catch {}
+            this.setState('ok'); this.startTimers();
+        } catch (e) { this.setState('error'); }
+    },
+    async unlink() {
+        if (!this.handle) return;
+        if (!confirm('فك الربط؟ لن يتم الحفظ التلقائي في الملف بعد ذلك (الملف نفسه لا يُحذف).')) return;
+        this.handle = null; this.remoteInfo = null; try { await this.kvDel('handle'); } catch {}
+        this.setState('none');
+    },
+
+    /* ---- status / UI ---- */
+    setState(st) { this.state = st; this.renderStatus(); },
+    renderStatus() {
+        const el = document.getElementById('syncStatus'), ic = document.getElementById('syncIcon'), btn = document.getElementById('syncBtn'), bn = document.getElementById('syncBanner');
+        if (!el) return;
+        const m = this.meta(); let txt = '', icon = 'cloud_off', tip = 'النسخ الاحتياطي';
+        const last = this.remoteInfo ? `آخر نسخة في الملف: <strong>${this.fmt(this.remoteInfo.savedAt)}</strong> (${this.remoteInfo.device || ''})` : '';
+        if (!this.supported) txt = 'المتصفح الحالي لا يدعم الربط التلقائي بملف (يعمل على Chrome أو Edge بالكمبيوتر). النسخ المحلية التلقائية تعمل مع ذلك.';
+        else if (!this.handle) txt = 'غير مربوط بملف. اربط ملفاً داخل مجلد Google Drive لتفعيل الحفظ التلقائي والمزامنة بين الأجهزة.';
+        else {
+            const name = this.handle.name || '';
+            if (this.state === 'needperm') { txt = `الملف <strong>${name}</strong> يحتاج إذنك: اضغط "تفعيل" أو "مزامنة الآن".`; icon = 'sync_problem'; }
+            else if (this.state === 'invalid') { txt = `الملف <strong>${name}</strong> ليس نسخة احتياطية صالحة.`; icon = 'sync_problem'; }
+            else if (this.state === 'error') { txt = `تعذر الحفظ في <strong>${name}</strong>. سيُعاد المحاولة.`; icon = 'sync_problem'; }
+            else { txt = `مربوط بـ <strong>${name}</strong> — ${last}`; icon = (m.savedAt || 0) > (m.syncedAt || 0) ? 'cloud_sync' : 'cloud_done'; tip = 'آخر حفظ: ' + this.fmt(m.syncedAt); }
+        }
+        el.innerHTML = txt; if (ic) ic.textContent = icon; if (btn) btn.title = tip;
+        if (bn) bn.classList.toggle('hidden', this.state !== 'needperm');
+        const un = document.getElementById('syncUnlinkBtn'), now = document.getElementById('syncNowBtn'), b = document.getElementById('syncBtns');
+        if (un) un.style.display = this.handle ? '' : 'none';
+        if (now) now.style.display = this.handle ? '' : 'none';
+        if (b && !this.supported) b.style.display = 'none';
+        this.renderSnaps();
+    },
+    async renderSnaps() {
+        const box = document.getElementById('snapList'); if (!box) return;
+        const list = await this.snaps();
+        box.innerHTML = list.length ? list.slice(0, 8).map(x => `<div style="display:flex;justify-content:space-between;align-items:center;padding:3px 0;border-bottom:1px solid var(--border)"><span>${this.fmt(x.ts)} — ${x.label}</span><button class="btn btn-outline btn-sm" onclick="Sync.restoreSnap(${x.ts})">استرجاع</button></div>`).join('') : 'لا توجد نسخ بعد (تُحفظ تلقائياً بعد التعديلات).';
+    },
+    startTimers() {
+        if (this._timers) return; this._timers = true;
+        setInterval(() => { if (this.handle && !document.hidden) this.check(); }, 45000);
+        document.addEventListener('visibilitychange', () => { if (!document.hidden && this.handle) this.check(); });
+        window.addEventListener('focus', () => { if (this.handle) this.check(); });
+    },
+    async init() {
+        this.lastSer = this.serialize();
+        this.renderStatus();
+        if (!this.supported) return;
+        try { const h = await this.kvGet('handle'); if (h) { this.handle = h; this.startTimers(); if (await this.perm(false)) await this.check(); else this.setState('needperm'); } } catch {}
+        this.renderStatus();
+    }
+};
+['saveEmployees', 'saveRecords', 'saveAttendance', 'saveSettings'].forEach(fn => { const o = DB[fn]; DB[fn] = function () { o.call(this); Sync.touch(); }; });
+
 /* ---------------- Init ---------------- */
 document.addEventListener('DOMContentLoaded', () => {
     if (DB.settings.theme === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
@@ -1421,6 +1727,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const setHdr = () => document.documentElement.style.setProperty('--hdr', document.querySelector('.app-header').offsetHeight + 'px');
     setHdr(); window.addEventListener('resize', setHdr); if (document.fonts) document.fonts.ready.then(setHdr);
     Payroll.render();
+    Sync.init();
 });
 </script>
 </body>
