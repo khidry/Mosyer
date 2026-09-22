@@ -1186,8 +1186,9 @@ const WAImport = {
         if (mode === 'auto') mode = dmyOk ? 'dmy' : (mdyOk ? 'mdy' : 'dmy');
 
         const IN = /[✅✔☑✓🟢]/u, OUT = /[❌✖✘✗✕❎🚫⛔🛑🔴🟥]/u;
+        const TIME_RE = /(\d{1,2})[:.](\d{2})\s*([AaPp]\.?\s?[Mm]\.?|ص|م)?/;
         const others = [];
-        const events = []; let minTs = Infinity, maxTs = -Infinity, ambiguous = 0;
+        const events = []; let minTs = Infinity, maxTs = -Infinity, ambiguous = 0, corrected = 0;
         entries.forEach(e => {
             let y, mo, d;
             if (e.alen === 4) { y = e.a; mo = e.b; d = e.c; }
@@ -1201,11 +1202,32 @@ const WAImport = {
             if (!e.sender) return;
             const hasIn = IN.test(e.text), hasOut = OUT.test(e.text);
             if (hasIn && hasOut) { ambiguous++; return; }
-            if (hasIn) events.push({ sender:e.sender, type:'in', ts });
-            else if (hasOut) events.push({ sender:e.sender, type:'out', ts });
-            else if (others.length < 3000) others.push({ sender:e.sender, text:e.text.trim().slice(0, 40), ts });
+            if (!hasIn && !hasOut) { if (others.length < 3000) others.push({ sender:e.sender, text:e.text.trim().slice(0, 40), ts }); return; }
+
+            // employee forgot to send at the actual moment, and typed the real time along with the emoji
+            // (e.g. "❌12:45" sent later at 4:52 PM) — use the typed time on the same calendar day instead of the send time
+            let eventTs = ts, wasCorrected = false;
+            const tm = e.text.match(TIME_RE);
+            if (tm) {
+                const th = +tm[1], tmin = +tm[2];
+                if (tmin <= 59 && (th !== e.h || tmin !== e.mi || !!tm[3] !== !!e.ap)) {
+                    const ap = (tm[3] || '').replace(/[\s.]/g, '').toLowerCase();
+                    const dayStartTs = ts - (h * 60 + e.mi);
+                    let cands;
+                    if (ap === 'pm' || ap === 'م') cands = [th === 12 ? 12 : th + 12];
+                    else if (ap === 'am' || ap === 'ص') cands = [th === 12 ? 0 : th];
+                    else { cands = (th <= 23) ? [th] : []; if (th >= 1 && th <= 11) cands.push(th + 12); }
+                    let best = null;
+                    cands.forEach(hh => { const cts = dayStartTs + hh * 60 + tmin; if (cts <= ts && (best === null || cts > best)) best = cts; });
+                    if (best === null && cands.length) best = dayStartTs + cands[0] * 60 + tmin;
+                    if (best !== null) { eventTs = best; wasCorrected = true; }
+                }
+            }
+            if (eventTs < minTs) minTs = eventTs; if (eventTs > maxTs) maxTs = eventTs;
+            if (wasCorrected) corrected++;
+            events.push({ sender:e.sender, type: hasIn ? 'in' : 'out', ts:eventTs, sentTs: wasCorrected ? ts : undefined });
         });
-        return { events, others, minTs, maxTs, total: entries.length, mode, ambiguous };
+        return { events, others, minTs, maxTs, total: entries.length, mode, ambiguous, corrected };
     },
 
     fmtTod(ts) { const m = ((ts % 1440) + 1440) % 1440; return this.pad(Math.floor(m / 60)) + ':' + this.pad(m % 60); },
@@ -1330,6 +1352,7 @@ const WAImport = {
                 <div class="wa-stat">فترة الملف: <strong>${range}</strong></div>
                 <div class="wa-stat">ترتيب التاريخ: <strong>${p.mode === 'dmy' ? 'يوم/شهر' : 'شهر/يوم'}</strong></div>
                 ${p.ambiguous ? `<div class="wa-stat">رسائل فيها ✅ و❌ معاً (تم تجاهلها): <strong>${p.ambiguous}</strong></div>` : ''}
+                ${p.corrected ? `<div class="wa-stat">أوقات مصححة من نص الرسالة (تسجيل متأخر): <strong>${p.corrected}</strong></div>` : ''}
             </div>
             ${othHtml}
             <div class="prefs-title">مطابقة أسماء الجروب مع الموظفين</div>
@@ -1372,6 +1395,7 @@ const WAImport = {
         Object.keys(byEmp).forEach(empId => {
             const emp = DB.employees.find(e => e.id === empId); if (!emp || !Employees.tracks(emp)) return;
             const r = this.buildDays(byEmp[empId], cutoffMin, maxShiftMin);
+            const empCorrected = byEmp[empId].filter(x => x.sentTs).length;
             r.warnings.forEach(w => {
                 const dn = this.dayNum(w.ts, cutoffMin);
                 if (dn < rs || dn > re) return;
@@ -1394,7 +1418,7 @@ const WAImport = {
             totalDays += count;
             const evc = byEmp[empId], lastDn = Math.max(...Object.keys(r.days).map(Number).filter(k => k >= rs && k <= re), -1);
             const ld = lastDn >= 0 ? rec.days[dayOf(lastDn)] : null;
-            lines.push(`${this.esc(emp.name)}: ${count} يوم — قرأت ✅${evc.filter(x => x.type === 'in').length} ❌${evc.filter(x => x.type === 'out').length}` + (ld ? ` — آخر يوم (${dayOf(lastDn)}): ${ld.in || '؟'} ← ${ld.out || '؟'}` : ''));
+lines.push(`${this.esc(emp.name)}: ${count} يوم — قرأت ✅${evc.filter(x => x.type === 'in').length} ❌${evc.filter(x => x.type === 'out').length}` + (empCorrected ? ` (منها ${empCorrected} بوقت مكتوب في الرسالة وليس وقت الإرسال)` : '') + (ld ? ` — آخر يوم (${dayOf(lastDn)}): ${ld.in || '؟'} ← ${ld.out || '؟'}` : ''));
         });
 
         const perEmp = {}; Object.keys(map).forEach(sn => { (perEmp[map[sn]] = perEmp[map[sn]] || []).push(sn); });
