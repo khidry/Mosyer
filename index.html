@@ -218,7 +218,7 @@ textarea { width:100%; padding:10px; border-radius:8px; border:1px solid var(--b
             <input type="month" id="payrollMonth" onchange="Payroll.render()">
             <div class="toolbar-actions">
                 <button class="btn btn-primary btn-sm" onclick="WAImport.open()"><span class="material-icons" style="font-size:16px;">chat</span> استيراد واتساب</button>
-                <button class="btn btn-outline btn-sm" onclick="Payroll.print()"><span class="material-icons" style="font-size:16px;">print</span> طباعة</button>
+                <button class="btn btn-outline btn-sm" onclick="Payroll.openExportPreview()"><span class="material-icons" style="font-size:16px;">share</span> تصدير / مشاركة</button>
                 <button class="btn btn-outline btn-sm" onclick="Payroll.viewAllSlipsAndAttendance()"><span class="material-icons" style="font-size:16px;">view_module</span> عرض الكروت والحضور</button>
             </div>
         </div>
@@ -314,9 +314,9 @@ textarea { width:100%; padding:10px; border-radius:8px; border:1px solid var(--b
             <label><input type="checkbox" id="darkModeToggle" onchange="Settings.toggleTheme(this.checked)"> الوضع الليلي</label>
         </div>
 
-        <div class="prefs-title">الطباعة</div>
+        <div class="prefs-title">التصدير والمشاركة</div>
         <div class="prefs-group">
-            <label><input type="checkbox" id="cleanPrintToggle" onchange="Settings.toggleCleanPrint(this.checked)"> طباعة نظيفة (إخفاء البنود الصفرية من الكروت)</label>
+            <label><input type="checkbox" id="cleanPrintToggle" onchange="Settings.toggleCleanPrint(this.checked)"> تصدير نظيف (إخفاء البنود الصفرية من الكروت)</label>
         </div>
 
         <div class="prefs-title">النسخ الاحتياطي التلقائي والمزامنة</div>
@@ -351,7 +351,7 @@ textarea { width:100%; padding:10px; border-radius:8px; border:1px solid var(--b
         <div id="empSlipContent"></div>
         <h3 id="empSlipAttTitle" style="font-size:13px; margin:16px 0 8px; color:var(--text-muted);">سجل الحضور والانصراف</h3>
         <div id="empAttendanceContent"></div>
-        <button class="btn btn-info btn-block mt-10" onclick="Payroll.printSingle()"><span class="material-icons" style="font-size:16px;">print</span> طباعة الكارت</button>
+        <button class="btn btn-info btn-block mt-10" onclick="Payroll.exportSingle()"><span class="material-icons" style="font-size:16px;">share</span> تصدير / مشاركة الكارت</button>
     </div>
 </div>
 
@@ -370,11 +370,11 @@ textarea { width:100%; padding:10px; border-radius:8px; border:1px solid var(--b
 <div class="modal-overlay" id="printPreviewModal">
     <div class="modal-card" style="max-width:600px;">
         <div class="modal-head">
-            <h2>معاينة الطباعة</h2>
+            <h2>معاينة التصدير</h2>
             <button class="modal-close" onclick="UI.closeModal('printPreviewModal')"><span class="material-icons">close</span></button>
         </div>
         <div id="printPreviewContent"></div>
-        <button class="btn btn-info btn-block mt-10" onclick="Payroll.confirmPrintAll()"><span class="material-icons" style="font-size:16px;">print</span> طباعة الكل</button>
+        <button class="btn btn-info btn-block mt-10" onclick="Payroll.exportAll()"><span class="material-icons" style="font-size:16px;">share</span> تصدير / مشاركة الكل</button>
     </div>
 </div>
 
@@ -398,6 +398,20 @@ textarea { width:100%; padding:10px; border-radius:8px; border:1px solid var(--b
         <button class="btn btn-primary btn-block mt-10" onclick="WAImport.analyze()"><span class="material-icons" style="font-size:16px;">search</span> تحليل الملف</button>
         <div id="waStep2" class="hidden"></div>
         <div id="waReport"></div>
+    </div>
+</div>
+
+<!-- Export result modal (fallback: preview + share/save) -->
+<div class="modal-overlay" id="exportResultModal">
+    <div class="modal-card" style="max-width:600px;">
+        <div class="modal-head">
+            <h2>الصورة جاهزة</h2>
+            <button class="modal-close" onclick="Exporter.closeResult()"><span class="material-icons">close</span></button>
+        </div>
+        <p class="wa-note">اضغط "مشاركة" لإرسالها (واتساب، حفظ في الصور، الملفات...) أو اضغط مطولاً على الصورة واختر حفظ.</p>
+        <img id="exportResultImg" alt="" style="width:100%; border:1px solid var(--border); border-radius:8px; background:#fff;">
+        <button class="btn btn-info btn-block mt-10" onclick="Exporter.shareCurrent()"><span class="material-icons" style="font-size:16px;">share</span> مشاركة</button>
+        <button class="btn btn-outline btn-block mt-10" onclick="Exporter.download()"><span class="material-icons" style="font-size:16px;">download</span> تنزيل الصورة</button>
     </div>
 </div>
 
@@ -458,6 +472,146 @@ const UI = {
     toast(msg) { let t = document.createElement('div'); t.className = 'toast'; t.textContent = msg; document.body.appendChild(t); setTimeout(() => { t.style.opacity = '0'; setTimeout(() => t.remove(), 300); }, 1600); },
     openModal(id) { document.getElementById(id).classList.add('active'); if (id === 'employeesModal') Employees.render(); if (id === 'settingsModal') Settings.render(); },
     closeModal(id) { document.getElementById(id).classList.remove('active'); }
+};
+
+
+/* ---------------- Exporter: card -> PNG image -> share sheet (works on iPhone) ---------------- */
+const Exporter = {
+    _blob: null, _name: 'salary.png', _title: '',
+
+    _rr(ctx, x, y, w, h, r) {
+        r = Math.max(0, Math.min(r, w / 2, h / 2));
+        ctx.beginPath();
+        ctx.moveTo(x + r, y);
+        ctx.arcTo(x + w, y, x + w, y + h, r);
+        ctx.arcTo(x + w, y + h, x, y + h, r);
+        ctx.arcTo(x, y + h, x, y, r);
+        ctx.arcTo(x, y, x + w, y, r);
+        ctx.closePath();
+    },
+
+    _visibleColor(c) { return c && c !== 'transparent' && !/rgba\(\s*\d+,\s*\d+,\s*\d+,\s*0\s*\)/.test(c); },
+
+    // Draws the (simple) HTML tree to a canvas using real layout positions
+    async _renderHTML(html, width, singleCard) {
+        const host = document.createElement('div');
+        host.style.cssText = 'position:fixed;left:-99999px;top:0;background:#fff;direction:rtl;padding:12px;width:' + width + 'px;';
+        host.innerHTML = html;
+        host.querySelectorAll('[id]').forEach(el => el.removeAttribute('id'));
+        host.querySelectorAll('.slip-container').forEach(el => { el.style.marginBottom = '0'; });
+        document.body.appendChild(host);
+        try {
+            if (document.fonts && document.fonts.ready) { try { await document.fonts.ready; } catch (e) {} }
+            const hr = host.getBoundingClientRect();
+            const W = Math.ceil(hr.width), H = Math.ceil(hr.height);
+            const scale = Math.min(3, Math.sqrt(12000000 / (W * H)));
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.round(W * scale); canvas.height = Math.round(H * scale);
+            const ctx = canvas.getContext('2d');
+            ctx.scale(scale, scale);
+            ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, W, H);
+
+            // backgrounds + borders
+            host.querySelectorAll('*').forEach(el => {
+                const cs = getComputedStyle(el);
+                if (cs.display === 'none' || cs.visibility === 'hidden') return;
+                const r = el.getBoundingClientRect();
+                if (r.width === 0 || r.height === 0) return;
+                const x = r.left - hr.left, y = r.top - hr.top, w = r.width, h = r.height;
+                const rad = parseFloat(cs.borderTopLeftRadius) || 0;
+                if (this._visibleColor(cs.backgroundColor)) {
+                    ctx.fillStyle = cs.backgroundColor;
+                    if (rad > 0) { this._rr(ctx, x, y, w, h, rad); ctx.fill(); } else ctx.fillRect(x, y, w, h);
+                }
+                const sides = ['Top', 'Right', 'Bottom', 'Left'].map(sd => ({
+                    sd, w: cs['border' + sd + 'Style'] === 'none' ? 0 : parseFloat(cs['border' + sd + 'Width']) || 0, c: cs['border' + sd + 'Color']
+                }));
+                const uniform = sides.every(b => b.w > 0 && b.w === sides[0].w && b.c === sides[0].c);
+                if (uniform && rad > 0) {
+                    const bw = sides[0].w;
+                    ctx.strokeStyle = sides[0].c; ctx.lineWidth = bw;
+                    this._rr(ctx, x + bw / 2, y + bw / 2, w - bw, h - bw, rad - bw / 2); ctx.stroke();
+                } else {
+                    sides.forEach(b => {
+                        if (b.w <= 0 || !this._visibleColor(b.c)) return;
+                        ctx.fillStyle = b.c;
+                        if (b.sd === 'Top') ctx.fillRect(x, y, w, b.w);
+                        if (b.sd === 'Bottom') ctx.fillRect(x, y + h - b.w, w, b.w);
+                        if (b.sd === 'Left') ctx.fillRect(x, y, b.w, h);
+                        if (b.sd === 'Right') ctx.fillRect(x + w - b.w, y, b.w, h);
+                    });
+                }
+            });
+
+            // text, word by word at its real position
+            const walker = document.createTreeWalker(host, NodeFilter.SHOW_TEXT);
+            const range = document.createRange();
+            let node;
+            while ((node = walker.nextNode())) {
+                if (!node.data.trim()) continue;
+                const cs = getComputedStyle(node.parentElement);
+                if (cs.display === 'none' || cs.visibility === 'hidden') continue;
+                ctx.font = `${cs.fontStyle} ${cs.fontWeight} ${cs.fontSize} ${cs.fontFamily}`;
+                ctx.fillStyle = cs.color;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.direction = cs.direction === 'ltr' ? 'ltr' : 'rtl';
+                const re = /\S+/g; let m;
+                while ((m = re.exec(node.data))) {
+                    range.setStart(node, m.index); range.setEnd(node, m.index + m[0].length);
+                    const rects = range.getClientRects();
+                    if (!rects.length) continue;
+                    const q = rects[0];
+                    ctx.fillText(m[0], q.left - hr.left + q.width / 2, q.top - hr.top + q.height / 2 + 0.5);
+                }
+            }
+            return await new Promise((res, rej) => canvas.toBlob(b => b ? res(b) : rej(new Error('toBlob failed')), 'image/png'));
+        } finally {
+            host.remove();
+        }
+    },
+
+    async exportHTML(html, width, filename, title) {
+        UI.toast('جاري تجهيز الصورة...');
+        let blob;
+        try { blob = await this._renderHTML(html, width); }
+        catch (e) { console.error(e); return UI.toast('تعذر إنشاء الصورة'); }
+        this._blob = blob; this._name = filename; this._title = title;
+        const file = new File([blob], filename, { type: 'image/png' });
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+            try { await navigator.share({ files: [file], title }); return; }
+            catch (e) { if (e && e.name === 'AbortError') return; /* otherwise show fallback */ }
+        }
+        this.showResult();
+    },
+
+    showResult() {
+        const img = document.getElementById('exportResultImg');
+        if (img.dataset.url) URL.revokeObjectURL(img.dataset.url);
+        const url = URL.createObjectURL(this._blob);
+        img.dataset.url = url; img.src = url;
+        UI.openModal('exportResultModal');
+    },
+
+    closeResult() { UI.closeModal('exportResultModal'); },
+
+    async shareCurrent() {
+        if (!this._blob) return;
+        const file = new File([this._blob], this._name, { type: 'image/png' });
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+            try { await navigator.share({ files: [file], title: this._title }); return; }
+            catch (e) { if (e && e.name === 'AbortError') return; }
+        }
+        UI.toast('اضغط مطولاً على الصورة لحفظها');
+    },
+
+    download() {
+        if (!this._blob) return;
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(this._blob); a.download = this._name;
+        document.body.appendChild(a); a.click();
+        setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1000);
+    }
 };
 
 /* ---------------- Field definitions for the sheet ---------------- */
@@ -621,24 +775,16 @@ const Payroll = {
         return `<div class="print-page-title">مسير الرواتب لشهر: ${Payroll.monthLabel(month)}</div><div class="print-cards-grid">${cards}</div>`;
     },
 
-    print() {
+    openExportPreview() {
         if (DB.employees.length === 0) return UI.toast('أضف موظفين أولاً');
         const month = document.getElementById('payrollMonth').value;
         document.getElementById('printPreviewContent').innerHTML = Payroll.buildCardsPage(month);
         UI.openModal('printPreviewModal');
     },
 
-    confirmPrintAll() {
+    exportAll() {
         const month = document.getElementById('payrollMonth').value;
-        document.getElementById('printArea').innerHTML = Payroll.buildCardsPage(month);
-        Payroll._withPrintTitle(`رواتب (${Payroll.monthLabel(month)})`);
-    },
-
-    _withPrintTitle(title) {
-        const prevTitle = document.title;
-        document.title = title;
-        setTimeout(() => window.print(), 150);
-        window.onafterprint = () => { document.title = prevTitle; window.onafterprint = null; };
+        Exporter.exportHTML(Payroll.buildCardsPage(month), 780, `رواتب-${month}.png`, `رواتب (${Payroll.monthLabel(month)})`);
     },
 
     generateSlipHTML(emp, month, showMonthInHeader = true) {
@@ -723,12 +869,11 @@ const Payroll = {
         UI.openModal('empSlipModal');
     },
 
-    printSingle() {
+    exportSingle() {
         const month = document.getElementById('payrollMonth').value;
         const emp = DB.employees.find(e => e.id === Payroll._currentSlipEmp);
         if (!emp) return;
-        document.getElementById('printArea').innerHTML = Payroll.generateSlipHTML(emp, month);
-        Payroll._withPrintTitle(`راتب ${emp.name} (${Payroll.monthLabel(month)})`);
+        Exporter.exportHTML(Payroll.generateSlipHTML(emp, month), 360, `راتب-${emp.name}-${month}.png`, `راتب ${emp.name} (${Payroll.monthLabel(month)})`);
     },
 
     viewAllSlipsAndAttendance() {
