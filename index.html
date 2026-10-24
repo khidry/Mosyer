@@ -385,7 +385,7 @@ textarea { width:100%; padding:10px; border-radius:8px; border:1px solid var(--b
             <h2>استيراد الحضور من واتساب <small style="font-weight:normal;color:var(--text-muted);font-size:10px;">(إصدار 5)</small></h2>
             <button class="modal-close" onclick="UI.closeModal('waImportModal')"><span class="material-icons">close</span></button>
         </div>
-        <p class="wa-note">من الجروب: ⋮ ← المزيد ← تصدير المحادثة، وارفع الملف كما هو (txt أو zip بدون فك الضغط). ✅ = حضور، ❌ = انصراف.</p>
+        <p class="wa-note">من الجروب: ⋮ ← المزيد ← تصدير المحادثة، وارفع الملف كما هو (txt أو zip بدون فك الضغط). ✅ = حضور، ❌ = انصراف (تُحسب فقط لو الرمز في رسالة لوحده بدون كلام).</p>
         <div class="form-group"><label>ملف المحادثة — txt أو zip مضغوط (يمكن اختيار أكثر من ملف)</label><input type="file" id="waFile" accept=".txt,.zip,text/plain,application/zip,application/x-zip-compressed" multiple></div>
         <div class="form-group mt-10"><label>أو الصق نص المحادثة هنا</label><textarea id="waPaste" rows="3" placeholder="اختياري"></textarea></div>
         <div class="form-group mt-10"><label>الشهر المطلوب استيراده</label><input type="month" id="waMonth"></div>
@@ -1337,7 +1337,7 @@ const WAImport = {
         const IN = /[✅✔☑✓🟢]/u, OUT = /[❌✖✘✗✕❎🚫⛔🛑🔴🟥]/u;
         const TIME_RE = /(\d{1,2})[:.](\d{2})\s*([AaPp]\.?\s?[Mm]\.?|ص|م)?/;
         const others = [];
-        const events = []; let minTs = Infinity, maxTs = -Infinity, ambiguous = 0, corrected = 0;
+        const events = []; let minTs = Infinity, maxTs = -Infinity, ambiguous = 0, corrected = 0, embedded = 0;
         entries.forEach(e => {
             let y, mo, d;
             if (e.alen === 4) { y = e.a; mo = e.b; d = e.c; }
@@ -1350,8 +1350,12 @@ const WAImport = {
             if (ts < minTs) minTs = ts; if (ts > maxTs) maxTs = ts;
             if (!e.sender) return;
             const hasIn = IN.test(e.text), hasOut = OUT.test(e.text);
-            if (hasIn && hasOut) { ambiguous++; return; }
             if (!hasIn && !hasOut) { if (others.length < 3000) others.push({ sender:e.sender, text:e.text.trim().slice(0, 40), ts }); return; }
+            // ✅/❌ counts ONLY when it is the whole message (emoji alone, optionally with a typed time).
+            // Any word next to it (a reply, a comment, a clarification) means it is not a check-in/out.
+            const rest = e.text.replace(/<[^>\n]{0,60}>/g, '').replace(new RegExp(TIME_RE.source, 'g'), '').replace(/[\p{L}\p{N}]/gu, m => (IN.test(m) || OUT.test(m)) ? '' : '\u0001');
+            if (rest.indexOf('\u0001') >= 0) { embedded++; if (others.length < 3000) others.push({ sender:e.sender, text:e.text.trim().slice(0, 40), ts }); return; }
+            if (hasIn && hasOut) { ambiguous++; return; }
 
             // employee forgot to send at the actual moment, and typed the real time along with the emoji
             // (e.g. "❌12:45" sent later at 4:52 PM) — use the typed time on the same calendar day instead of the send time
@@ -1368,7 +1372,7 @@ const WAImport = {
                     else { cands = (th <= 23) ? [th] : []; if (th >= 1 && th <= 11) cands.push(th + 12); }
                     let best = null;
                     cands.forEach(hh => { const cts = dayStartTs + hh * 60 + tmin; if (cts <= ts && (best === null || cts > best)) best = cts; });
-                    if (best === null && cands.length) best = dayStartTs + cands[0] * 60 + tmin;
+                    if (best === null && cands.length) best = dayStartTs + cands[0] * 60 + tmin - 1440;   // a typed time can't be in the future: it belongs to the previous day
                     if (best !== null) { eventTs = best; wasCorrected = true; }
                 }
             }
@@ -1376,7 +1380,7 @@ const WAImport = {
             if (wasCorrected) corrected++;
             events.push({ sender:e.sender, type: hasIn ? 'in' : 'out', ts:eventTs, sentTs: wasCorrected ? ts : undefined });
         });
-        return { events, others, minTs, maxTs, total: entries.length, mode, ambiguous, corrected };
+        return { events, others, minTs, maxTs, total: entries.length, mode, ambiguous, corrected, embedded };
     },
 
     fmtTod(ts) { const m = ((ts % 1440) + 1440) % 1440; return this.pad(Math.floor(m / 60)) + ':' + this.pad(m % 60); },
@@ -1386,7 +1390,7 @@ const WAImport = {
     /* Pure: one employee's events -> { days:{dayNum:{in,bOut,bIn,out,xb}}, warnings:[], sessions } */
     buildDays(evs, cutoffMin, maxShiftMin) {
         evs = evs.slice().sort((x, y) => x.ts - y.ts || (x.type === 'in' ? -1 : 1));
-        const warnings = [], sessions = []; let open = null;
+        const warnings = [], sessions = []; let open = null, fixedOut = 0;
         const w = (ts, msg, kind) => warnings.push({ ts, kind: kind || '', text: `${this.fmtFull(ts)} — ${msg}` });
         evs.forEach(ev => {
             if (ev.type === 'in') {
@@ -1396,7 +1400,17 @@ const WAImport = {
                 } else open = { start:ev.ts };
             } else {
                 if (!open) w(ev.ts, 'انصراف بدون حضور (تم تجاهله)');
-                else if (ev.ts - open.start > maxShiftMin) { sessions.push({ start:open.start, end:null }); w(open.start, 'حضور بدون انصراف', 'unclosed'); w(ev.ts, 'انصراف بدون حضور (تم تجاهله)'); open = null; }
+                else if (ev.ts - open.start > maxShiftMin) {
+                    // Forgotten checkout: the employee remembered the next day and sent ❌ then. The real leaving time is 12 hours earlier
+                    // (sent 11:16 → left 23:16). Accept it only if that gives a sane shift (after check-in and within the max shift).
+                    const fixTs = ev.ts - 720;
+                    if (fixTs > open.start && fixTs - open.start <= maxShiftMin) {
+                        sessions.push({ start:open.start, end:fixTs });
+                        w(ev.ts, `انصراف متأخر (أُرسل بعد نسيان) — حُسب ${this.fmtFull(fixTs)} بدل ${this.fmtTod(ev.ts)}`, 'fixed');
+                        fixedOut++;
+                    } else { sessions.push({ start:open.start, end:null }); w(open.start, 'حضور بدون انصراف', 'unclosed'); w(ev.ts, 'انصراف بدون حضور (تم تجاهله)'); }
+                    open = null;
+                }
                 else { sessions.push({ start:open.start, end:ev.ts }); open = null; }
             }
         });
@@ -1417,7 +1431,7 @@ const WAImport = {
             const day = rows[0]; day.x = rows.slice(1);
             days[k] = day;
         });
-        return { days, warnings, sessions: sessions.length };
+        return { days, warnings, sessions: sessions.length, fixedOut };
     },
 
     async readZipText(file) {
@@ -1501,6 +1515,7 @@ const WAImport = {
                 <div class="wa-stat">فترة الملف: <strong>${range}</strong></div>
                 <div class="wa-stat">ترتيب التاريخ: <strong>${p.mode === 'dmy' ? 'يوم/شهر' : 'شهر/يوم'}</strong></div>
                 ${p.ambiguous ? `<div class="wa-stat">رسائل فيها ✅ و❌ معاً (تم تجاهلها): <strong>${p.ambiguous}</strong></div>` : ''}
+                ${p.embedded ? `<div class="wa-stat">رسائل فيها ✅/❌ وسط كلام (تم تجاهلها): <strong>${p.embedded}</strong></div>` : ''}
                 ${p.corrected ? `<div class="wa-stat">أوقات مصححة من نص الرسالة (تسجيل متأخر): <strong>${p.corrected}</strong></div>` : ''}
             </div>
             ${othHtml}
