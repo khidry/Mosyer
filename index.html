@@ -385,7 +385,7 @@ textarea { width:100%; padding:10px; border-radius:8px; border:1px solid var(--b
             <h2>استيراد الحضور من واتساب <small style="font-weight:normal;color:var(--text-muted);font-size:10px;">(إصدار 5)</small></h2>
             <button class="modal-close" onclick="UI.closeModal('waImportModal')"><span class="material-icons">close</span></button>
         </div>
-        <p class="wa-note">من الجروب: ⋮ ← المزيد ← تصدير المحادثة، وارفع الملف كما هو (txt أو zip بدون فك الضغط). ✅ = حضور، ❌ = انصراف (تُحسب فقط لو الرمز في رسالة لوحده بدون كلام).</p>
+        <p class="wa-note">من الجروب: ⋮ ← المزيد ← تصدير المحادثة، وارفع الملف كما هو (txt أو zip بدون فك الضغط). ✅ = حضور، ❌ = انصراف (✅ تُحسب فقط في رسالة لوحدها بدون كلام؛ أما ❌ مع كلام فتُحسب انصراف لو الموظف مسجّل حضور).</p>
         <div class="form-group"><label>ملف المحادثة — txt أو zip مضغوط (يمكن اختيار أكثر من ملف)</label><input type="file" id="waFile" accept=".txt,.zip,text/plain,application/zip,application/x-zip-compressed" multiple></div>
         <div class="form-group mt-10"><label>أو الصق نص المحادثة هنا</label><textarea id="waPaste" rows="3" placeholder="اختياري"></textarea></div>
         <div class="form-group mt-10"><label>الشهر المطلوب استيراده</label><input type="month" id="waMonth"></div>
@@ -1337,7 +1337,7 @@ const WAImport = {
         const IN = /[✅✔☑✓🟢]/u, OUT = /[❌✖✘✗✕❎🚫⛔🛑🔴🟥]/u;
         const TIME_RE = /(\d{1,2})[:.](\d{2})\s*([AaPp]\.?\s?[Mm]\.?|ص|م)?/;
         const others = [];
-        const events = []; let minTs = Infinity, maxTs = -Infinity, ambiguous = 0, corrected = 0, embedded = 0;
+        const events = []; let minTs = Infinity, maxTs = -Infinity, ambiguous = 0, corrected = 0, embedded = 0, softOut = 0;
         entries.forEach(e => {
             let y, mo, d;
             if (e.alen === 4) { y = e.a; mo = e.b; d = e.c; }
@@ -1354,7 +1354,12 @@ const WAImport = {
             // ✅/❌ counts ONLY when it is the whole message (emoji alone, optionally with a typed time).
             // Any word next to it (a reply, a comment, a clarification) means it is not a check-in/out.
             const rest = e.text.replace(/<[^>\n]{0,60}>/g, '').replace(new RegExp(TIME_RE.source, 'g'), '').replace(/[\p{L}\p{N}]/gu, m => (IN.test(m) || OUT.test(m)) ? '' : '\u0001');
-            if (rest.indexOf('\u0001') >= 0) { embedded++; if (others.length < 3000) others.push({ sender:e.sender, text:e.text.trim().slice(0, 40), ts }); return; }
+            if (rest.indexOf('\u0001') >= 0) {
+                // ❌ with words (e.g. a reply to his own ✅: "❌ نص ساعه وراجع") = a checkout WITH an explanation, but only if he is
+                // currently checked in (decided in buildDays). The WhatsApp export doesn't include the quoted message, so this is how a reply is recognised.
+                if (hasOut && !hasIn) { if (ts < minTs) minTs = ts; if (ts > maxTs) maxTs = ts; softOut++; events.push({ sender:e.sender, type:'out', ts, soft:true }); return; }
+                embedded++; if (others.length < 3000) others.push({ sender:e.sender, text:e.text.trim().slice(0, 40), ts }); return;
+            }
             if (hasIn && hasOut) { ambiguous++; return; }
 
             // employee forgot to send at the actual moment, and typed the real time along with the emoji
@@ -1380,7 +1385,7 @@ const WAImport = {
             if (wasCorrected) corrected++;
             events.push({ sender:e.sender, type: hasIn ? 'in' : 'out', ts:eventTs, sentTs: wasCorrected ? ts : undefined });
         });
-        return { events, others, minTs, maxTs, total: entries.length, mode, ambiguous, corrected, embedded };
+        return { events, others, minTs, maxTs, total: entries.length, mode, ambiguous, corrected, embedded, softOut };
     },
 
     fmtTod(ts) { const m = ((ts % 1440) + 1440) % 1440; return this.pad(Math.floor(m / 60)) + ':' + this.pad(m % 60); },
@@ -1399,7 +1404,8 @@ const WAImport = {
                     else if (ev.ts - open.start >= 3) w(ev.ts, 'حضور مكرر بدون انصراف (تم تجاهله)');
                 } else open = { start:ev.ts };
             } else {
-                if (!open) w(ev.ts, 'انصراف بدون حضور (تم تجاهله)');
+                if (!open) { if (!ev.soft) w(ev.ts, 'انصراف بدون حضور (تم تجاهله)'); }
+                else if (ev.soft && ev.ts - open.start > maxShiftMin) { /* ❌ inside a sentence, far from the check-in: just chat, ignore */ }
                 else if (ev.ts - open.start > maxShiftMin) {
                     // Forgotten checkout: the employee remembered the next day and sent ❌ then. The real leaving time is 12 hours earlier
                     // (sent 11:16 → left 23:16). Accept it only if that gives a sane shift (after check-in and within the max shift).
