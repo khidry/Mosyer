@@ -856,7 +856,7 @@ const Payroll = {
         if (hasAttendance) {
             if (attTitle) attTitle.style.display = 'block';
             attContent.style.display = 'block';
-            attContent.innerHTML = Attendance.render(emp, month);
+            attContent.innerHTML = Attendance.warnHTML(emp, month) + Attendance.render(emp, month);
             Attendance.refreshSheetInputs(empId);
         } else {
             // إخفاء سجل الحضور إذا لم يكن لديه إجازات (الرصيد 0)
@@ -887,7 +887,7 @@ const Payroll = {
             
             Attendance.syncToPayroll(emp, month);
             let slipHTML = Payroll.generateSlipHTML(emp, month);
-            let attHTML = Attendance.render(emp, month);
+            let attHTML = Attendance.warnHTML(emp, month) + Attendance.render(emp, month);
             html += `<div class="slip-att-wrapper">
                         <div id="bulk-slip-${emp.id}">${slipHTML}</div>
                         <h3 style="font-size:13px; margin:16px 0 8px; color:var(--text-muted);">سجل الحضور - ${emp.name}</h3>
@@ -1080,6 +1080,21 @@ const Attendance = {
         const bulkSlip = document.getElementById('bulk-slip-' + empId);
         if (bulkSlip) bulkSlip.innerHTML = Payroll.generateSlipHTML(emp, month);
         Attendance.refreshSheetInputs(empId);
+    },
+
+    warnHTML(emp, month) {
+        const ws = DB.getAttendance(emp.id, month).warnings || [];
+        if (!ws.length) return '';
+        return `<div class="wa-warn" data-warn="${emp.id}" style="margin-bottom:8px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; font-weight:800; margin-bottom:4px;"><span>⚠ تنبيهات تحتاج مراجعة (${ws.length})</span>
+            <button type="button" class="btn btn-outline btn-sm" onclick="Attendance.clearWarn('${emp.id}','${month}')">تمت المراجعة</button></div>
+            ${ws.map(t => WAImport.esc(t)).join('<br>')}</div>`;
+    },
+
+    clearWarn(empId, month) {
+        DB.getAttendance(empId, month).warnings = [];
+        DB.saveAttendance();
+        document.querySelectorAll('[data-warn="' + empId + '"]').forEach(el => el.remove());
     },
 
     rerender(empId, month, el) {
@@ -1582,13 +1597,16 @@ const WAImport = {
             const emp = DB.employees.find(e => e.id === empId); if (!emp || !Employees.tracks(emp)) return;
             const r = this.buildDays(byEmp[empId], cutoffMin, maxShiftMin);
             const empCorrected = byEmp[empId].filter(x => x.sentTs).length;
+            const empW = [];
             r.warnings.forEach(w => {
                 const dn = this.dayNum(w.ts, cutoffMin);
                 if (dn < rs || dn > re) return;
                 if (openDn !== null && dn === openDn && w.kind === 'unclosed') return;
                 allWarn.push(`<strong>${this.esc(emp.name)}</strong>: ${w.text}`);
+                empW.push(w.text);
             });
             const rec = DB.getAttendance(empId, monthKey);
+            rec.warnings = empW;   // shown at the top of this employee's attendance log until he taps "reviewed" or re-imports
             const def = DB.defaultDayAttendance(emp); let count = 0;
             for (let dn = rs; dn <= re; dn++) {
                 const d = dayOf(dn); if (!rec.days[d]) continue;
@@ -1629,7 +1647,7 @@ lines.push(`${this.esc(emp.name)}: ${count} يوم — قرأت ✅${evc.filter(
             (skipped ? `<br><span style="color:var(--text-muted)">تم تجاهل ${skipped} رسالة من أسماء غير مربوطة</span>` : '') + `</div>` +
             (dupNames.length ? `<div class="wa-warn mt-10">⚠ أكثر من اسم مربوط بنفس الموظف (يُدمجون معاً): ${this.esc(dupNames.join(' | '))}</div>` : '') +
             (unmapped.length ? `<div class="wa-warn mt-10">موظفون عليهم حضور لكن لم يُربط لهم اسم (لم تتغير أيامهم): ${this.esc(unmapped.join('، '))}</div>` : '') +
-            (allWarn.length ? `<div class="prefs-title">تنبيهات تحتاج مراجعة (${allWarn.length})</div><div class="wa-warn">${allWarn.join('<br>')}</div>` : '');
+            (allWarn.length ? `<div class="wa-warn mt-10">⚠ ${allWarn.length} تنبيه تحتاج مراجعة — تظهر الآن في كارت كل موظف تحت «سجل الحضور والانصراف» وقبل الجدول.</div>` : '');
         UI.toast('تم الاستيراد');
     }
 };
