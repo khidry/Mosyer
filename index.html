@@ -108,11 +108,10 @@ tr.row-net-final td, tr.row-net-final th { background:var(--gold-dark); color:#f
 .empty-state { padding:30px 15px; text-align:center; color:var(--text-muted); font-size:13px; }
 
 /* Modals - floating & simple */
-.modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:3000; display:flex; justify-content:center; align-items:flex-end; opacity:0; pointer-events:none; transition:.25s; }
+.modal-overlay { position:fixed; inset:0; box-sizing:border-box; padding:max(20px, env(safe-area-inset-top)) 14px max(64px, env(safe-area-inset-bottom));   /* extra bottom room so the browser's bottom bar never covers the buttons */ background:rgba(0,0,0,.55); z-index:3000; display:flex; justify-content:center; align-items:center; opacity:0; pointer-events:none; transition:.25s; }
 .modal-overlay.active { opacity:1; pointer-events:all; }
-@media (min-width:560px) { .modal-overlay { align-items:center; } }
-.modal-card { background:var(--card-bg); width:100%; max-width:520px; max-height:88vh; overflow-y:auto; border-radius:16px 16px 0 0; padding:18px; position:relative; transform:translateY(24px); transition:.25s; box-shadow:0 -10px 30px rgba(0,0,0,.25); }
-@media (min-width:560px) { .modal-card { border-radius:16px; } }
+.modal-overlay.active .modal-card { transform:none; }
+.modal-card { background:var(--card-bg); width:100%; max-width:520px; max-height:100%; overflow-y:auto; overscroll-behavior:contain; -webkit-overflow-scrolling:touch; box-sizing:border-box; border-radius:16px; padding:18px 18px 22px; position:relative; transform:translateY(24px); transition:.25s; box-shadow:0 10px 30px rgba(0,0,0,.35); }
 .modal-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; }
 .modal-head h2 { font-size:16px; color:var(--primary); }
 .modal-close { background:none; border:none; color:var(--text-muted); cursor:pointer; padding:4px; display:flex; }
